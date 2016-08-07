@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!--- Put your DTDDoc comment here. -->
+<!ELEMENT morphological-analysers (morphological-analyser-info)+>
+
+<!--- Put your DTDDoc comment here. -->
+<!ELEMENT morphological-analyser-info (name, supportedLocales, dataPath, tagged, quality, speed, version, vendor, authors, buildData, licence, webPage, description, copyright)>
+
+<!ELEMENT supportedLocales (supportedlocale+)>
+
+<!ELEMENT name (#PCDATA)>
+<!ELEMENT dataPath (#PCDATA)>
+<!ELEMENT tagged (#PCDATA)>
+<!ELEMENT quality (#PCDATA)>
+<!ELEMENT speed (#PCDATA)>
+<!ELEMENT version (#PCDATA)>
+<!ELEMENT vendor (#PCDATA)> 
+<!ELEMENT authors (#PCDATA)>
+<!ELEMENT buildData (#PCDATA)>
+<!ELEMENT licence (#PCDATA)>
+<!ELEMENT webPage (#PCDATA)>
+<!ELEMENT description (#PCDATA)>
+<!ELEMENT copyright (#PCDATA)>
+<!ELEMENT supportedlocale (#PCDATA)>
+
+

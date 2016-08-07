@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--- 
+	Information about tagging of inflection pattern using a file 
+	containing example tagged forms. 
+-->
+<!ELEMENT tagging-info (encoding, tag-modification?)>
+
+<!--- Encoding of a file with examples. -->
+<!ELEMENT encoding (#PCDATA)>
+
+<!--- Defines modification of tags. -->
+<!ELEMENT tag-modification (replacement)*>
+
+<!--- Defines a replacement of one tag with another. -->
+<!ELEMENT replacement (source-tag, target-tag)>
+
+<!--- Tag to replace. -->
+<!ELEMENT source-tag (#PCDATA)>
+
+<!--- Replacement tag. -->
+<!ELEMENT target-tag (#PCDATA)>

@@ -1,0 +1,64 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1" />
+</head>
+<body bgcolor="white">
+
+Classes which represents and manages inflection patterns.
+
+<h2>Package Specification</h2>
+<p>
+The {@link org.neurpheus.nlp.morphology.inflection.InflectionPatternImpl} is a basic implementation of the 
+{@link org.neurpheus.nlp.morphology.inflection.InflectionPattern} interface and represents a set of rules which can
+create any form of a lexeme (word)
+</p>
+<p>
+Each inflection pattern covers a set of lexemes which have different cores
+and the same inflection rules. The cores covered by the same inflection pattern
+has some similarities. The {@link org.neurpheus.nlp.morphology.inflection.CorePattern} class represents a template
+for a subset of cores which have the same suffixes. A core pattern coveres
+some cores belonging to single inflection patterns. The inflection patterns
+could have many core patterns which covers all cores belonging to this inflection
+pattern.
+</p>
+<p>
+The {@link org.neurpheus.nlp.morphology.inflection.InflectionPatternsBase} manages all inflection patterns belonging
+to a natural language. This class can create a set inflection patterns
+analysing a full dictionary of any language. This class can also determine
+core patterns for all inflection patterns stored in this base.
+</p>
+<p>
+A morphological analyser process on arrays of inflection patterns. It is 
+efficient to hold these arrays in a single place because the same array
+can be refered by many other objects and it is good idea to represent such
+array as integer identifiers. The {@link org.neurpheus.nlp.morphology.inflection.InflectionPatternsMap} class 
+represents a mapping between integer identifiers and arrays of inflection
+patterns.
+</p>
+<p>
+The {@link org.neurpheus.nlp.morphology.inflection.InflectionPatternFactory} creates inflection patterns and inflection
+patterns bases (IPBes). Bacause IPBes can be used in many places in the system, this 
+class registers IPBes and returns an IPB for a required language in any place
+of a code.
+</p>
+
+<center><hr>
+<b>Neurpheus - Morfological Analyser</b>
+<br>Copyright &copy; 2006 Jakub Strychowski
+<div><font size='1'>
+This library is free software; you can redistribute it and/or modify it
+under the terms of the <b>GNU Lesser General Public License</b> as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+This library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
+for more details.
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+</font></div>
+<hr></center>
+</body>
+</html> 

@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE tagging-info SYSTEM "tagging.dtd">
+<tagging-info>
+    <encoding>cp1250</encoding>
+    <tag-modification>
+        <replacement>
+            <source-tag>m1</source-tag>
+            <target-tag>m</target-tag>
+        </replacement>
+        <replacement>
+            <source-tag>m2</source-tag>
+            <target-tag>m</target-tag>
+        </replacement>
+        <replacement>
+            <source-tag>m3</source-tag>
+            <target-tag>m</target-tag>
+        </replacement>
+    </tag-modification>
+</tagging-info>

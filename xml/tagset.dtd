@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!--- Root element of the tagset definition. -->
+<!ELEMENT tagset (language*, category*)>
+<!ATTLIST tagset xmlns CDATA #IMPLIED>
+
+<!--- Describes one of the language used in documents. Language can have many symbols and names. -->
+<!ELEMENT language (symbol+, name*)>
+
+<!--- A symbol of a language, a tag, a category and so on. -->
+<!ELEMENT symbol (#PCDATA)>
+
+<!--- A value of name, description and so on -->
+<!ELEMENT value (#PCDATA)>
+
+<!--- A value of name, description and so on -->
+<!ELEMENT lang (#PCDATA)>
+
+<!--- Name of a tag or a grammatical category written in the specified language. -->
+<!ELEMENT name (lang, value)>
+
+<!--- Describes a grammatical category. The category can have symbol, many names, descriptions, and tags. -->
+<!ELEMENT category (symbol, name*, description*, tag*)>
+
+<!--- Describes a grammatical category or a tag in the specified language. -->
+<!ELEMENT description (lang, value)>
+
+<!--- A tag representing a grammatical property. Each tag can be specified using many symbols, examples, descriptions and names. -->
+<!ELEMENT tag (symbol, name*, description*, example*)>
+
+<!--- An example word form written in a given language. -->
+<!ELEMENT example (lang, value)>

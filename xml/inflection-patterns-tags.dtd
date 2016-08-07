@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!--- Represents a base of inflection patterns. -->
+<!ELEMENT inflection-patterns-base (inflection-pattern-definition)+>
+
+<!--- Definition of single inflection pattern. -->
+<!ELEMENT inflection-pattern-definition (pattern-code, pattern, cores, covered-patterns)>
+
+<!--- String representation of inflection pattern. -->
+<!ELEMENT pattern-code (#PCDATA)>
+
+<!--- Definitions of form patterns. -->
+<!ELEMENT pattern (form-pattern)+>
+
+<!--- Single form pattern. -->
+<!ELEMENT form-pattern (affixes, grammatical-properties-list)>
+
+<!--- Pattern of grammatical morphemes. -->
+<!ELEMENT affixes (#PCDATA)>
+
+<!--- List of grammatical properties. -->
+<!ELEMENT grammatical-properties-list (grammatical-properties-mark)+>
+
+<!--- Single mark representing grammatical properties. -->
+<!ELEMENT grammatical-properties-mark (#PCDATA)>
+
+<!--- List of space separated cores covered by an inflection pattern. -->
+<!ELEMENT cores (#PCDATA)>
+
+<!--- Inflection patterns covered by the definition of inflection pattern. -->
+<!ELEMENT covered-patterns (covered-pattern)+>
+
+<!--- Single inflection pattern covered by a definition. -->
+<!ELEMENT covered-pattern (pattern-code)>
