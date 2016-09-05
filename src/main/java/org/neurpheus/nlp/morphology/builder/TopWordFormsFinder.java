@@ -55,7 +55,7 @@ public class TopWordFormsFinder {
             buffer.close();
             buffer = null;
             // process string
-            String[] tokens = text.split("\\s|\\p{Punct}|\\d|_|—|–|\\?");
+            String[] tokens = text.split("\\s|\\p{Punct}|\\d|_|â€”|â€“|\\?");
             for (int i = tokens.length - 1; i >= 0; i--) {
                 String token = tokens[i].trim().toLowerCase();
                 if (token.length() > 0) {

@@ -49,7 +49,7 @@ public interface BaseFormsDictionary {
      * 
      * @return A collection of base forms in a particular language.
      */
-    Collection getBaseForms();
+    Collection<String> getBaseForms();
 
     /**
      * Returns an array of inflection patters related with the given base form. 

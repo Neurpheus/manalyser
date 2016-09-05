@@ -26,7 +26,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
-import org.apache.log4j.Logger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.neurpheus.core.io.DataOutputStreamPacker;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
 
@@ -41,7 +42,7 @@ public class InflectionPatternsMap implements Serializable {
     static final long serialVersionUID = 770608060828184716L;
     
     /** Logging module used by this class. */
-    private static Logger logger = Logger.getLogger(InflectionPatternsMap.class);
+    private static Logger logger = Logger.getLogger(InflectionPatternsMap.class.getName());
     
     /** Holds entries of this mapping. */
     private ArrayList items;
@@ -148,8 +149,8 @@ public class InflectionPatternsMap implements Serializable {
             reverseMap.clear();
             reverseMap = null;
         }
-        if (logger.isDebugEnabled()) {
-            logger.debug("Number of differen inflection patterns arrays = " + items.size());
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Number of differen inflection patterns arrays = " + items.size());
         }
     }
     

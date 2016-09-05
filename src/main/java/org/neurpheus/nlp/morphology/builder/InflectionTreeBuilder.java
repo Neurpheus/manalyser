@@ -21,7 +21,7 @@ import org.neurpheus.nlp.morphology.inflection.InflectionPatternImpl;
 import org.neurpheus.nlp.morphology.inflection.InflectionPatternsBase;
 import org.neurpheus.collections.tree.Tree;
 import org.neurpheus.collections.tree.TreeFactory;
-import org.neurpheus.collections.tree.TreeLeaf;
+import org.neurpheus.collections.tree.TreeNodeWithData;
 import org.neurpheus.collections.tree.TreeNode;
 import org.neurpheus.collections.tree.objecttree.ObjectTreeFactory;
 import org.neurpheus.core.string.StringHelper;
@@ -103,9 +103,9 @@ public class InflectionTreeBuilder {
     }
     
     private static void mapNodeData(TreeNode node, InflectionPatternsMap ipmap) {
-        if (node.isLeaf()) {
-            TreeLeaf leaf = (TreeLeaf) node;
-            Object obj = leaf.getData();
+        if (node.hasExtraData()) {
+            TreeNodeWithData nodeWithData = (TreeNodeWithData) node;
+            Object obj = nodeWithData.getData();
             ExtendedInflectionPattern[] patterns;
             if (obj instanceof ExtendedInflectionPattern) {
                 patterns = new ExtendedInflectionPattern[1];
@@ -114,7 +114,7 @@ public class InflectionTreeBuilder {
                 patterns = (ExtendedInflectionPattern[]) obj;
             }
             int index = ipmap.add(patterns);
-            leaf.setData(new Integer(index));
+            nodeWithData.setData(new Integer(index));
         }
         for (Iterator it = node.getChildren().iterator(); it.hasNext();) {
             TreeNode child = (TreeNode) it.next();
@@ -198,25 +198,25 @@ public class InflectionTreeBuilder {
                 parentNode.addChild(node);
             }
         }
-        if (node.isLeaf()) {
-            TreeLeaf leaf = (TreeLeaf) node;
-            Object obj = leaf.getData();
+        if (node.hasExtraData()) {
+            TreeNodeWithData nodeWithData = (TreeNodeWithData) node;
+            Object obj = nodeWithData.getData();
             if (obj instanceof ExtendedInflectionPattern[]) {
                 ExtendedInflectionPattern[] oldArray = (ExtendedInflectionPattern[]) obj;
                 ExtendedInflectionPattern[] newArray = new ExtendedInflectionPattern[oldArray.length + 1];
                 System.arraycopy(oldArray, 0, newArray, 0, oldArray.length);
                 newArray[oldArray.length] = data;
-                leaf.setData(newArray);
+                nodeWithData.setData(newArray);
             } else {
                 ExtendedInflectionPattern[] newArray = new ExtendedInflectionPattern[2];
                 newArray[0] = (ExtendedInflectionPattern) obj;
                 newArray[1] = data;
-                leaf.setData(newArray);
+                nodeWithData.setData(newArray);
             }
         } else if (data != null) {
-            TreeLeaf leaf = tree.getFactory().createTreeLeaf(node.getValue(), data);
-            leaf.setChildren(node.getChildren());
-            parentNode.replaceChild(node, leaf);
+            TreeNodeWithData nodeWithData = tree.getFactory().createTreeNodeWithAdditionalData(node.getValue(), data);
+            nodeWithData.setChildren(node.getChildren());
+            parentNode.replaceChild(node, nodeWithData);
         }
     }
     

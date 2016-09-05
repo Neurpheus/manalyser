@@ -1,11 +1,3 @@
-/*
- * MorphologicalAnalysisResultImpl.java
- *
- * Created on 28 wrzesieñ 2006, 10:01
- *
- * To change this template, choose Tools | Template Manager
- * and open the template in the editor.
- */
 
 package org.neurpheus.nlp.morphology.impl;
 
@@ -20,25 +12,25 @@ import org.neurpheus.nlp.morphology.tagset.GrammaticalPropertiesList;
  * @author Jakub Strychowski
  */
 public class ExtendedMorphologicalAnalysisResult extends MorphologicalAnalysisResultImpl {
-    
+
     /** The unique identifier of this class. */
     public static final long serialVersionUID = -770608080505111114L;
-    
+
     //private ExtendedInflectionPattern[] ipa;
     private ExtendedInflectionPattern ip;
-    
+
     /** Creates a new instance of MorphologicalAnalysisResultImpl */
     public ExtendedMorphologicalAnalysisResult() {
     }
-    
+
     public ExtendedMorphologicalAnalysisResult(
-            final String baseFormValue, 
-            final double weightValue, 
+            final String baseFormValue,
+            final double weightValue,
             final String cor,
             final String supplement,
             final GrammaticalPropertiesList gramPropList,
             final ExtendedInflectionPattern ipValue
-            ) {
+    ) {
         super(baseFormValue, weightValue, cor, supplement, gramPropList);
         ip = ipValue;
     }
@@ -51,20 +43,18 @@ public class ExtendedMorphologicalAnalysisResult extends MorphologicalAnalysisRe
         this.ip = ipValue;
     }
 
-
     public String toString() {
         StringBuffer res = new StringBuffer(super.toString());
         if (ip != null) {
 //            for (int i = 0 ; i < ipa.length; i++) {
-                res.append("\n    ");
-                res.append(ip.getId());
-                res.append(" : ");
-                res.append(ip.toString());
+            res.append("\n    ");
+            res.append(ip.getId());
+            res.append(" : ");
+            res.append(ip.toString());
 //            }
         }
         return res.toString();
     }
-    
 
     public ExtendedInflectionPattern getInflectionPattern() {
         return ip;
@@ -72,7 +62,7 @@ public class ExtendedMorphologicalAnalysisResult extends MorphologicalAnalysisRe
 
     /**
      * Returns grammatical properties of an analysed form.
-     * 
+     *
      * @return The grammatical properties determined from morphemes of the analysed form.
      */
     public GrammaticalPropertiesList getGrammaticalPropertiesList() {
@@ -91,7 +81,5 @@ public class ExtendedMorphologicalAnalysisResult extends MorphologicalAnalysisRe
         }
         return grammaticalPropertiesList;
     }
-    
-    
-    
+
 }

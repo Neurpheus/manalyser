@@ -13,7 +13,53 @@
  *  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
  *  for more details.
  */
+
 package org.neurpheus.nlp.morphology.builder;
+
+import org.neurpheus.collections.hashing.BloomFilter;
+import org.neurpheus.collections.tree.Tree;
+import org.neurpheus.collections.tree.linkedlist.LinkedListTree;
+import org.neurpheus.collections.tree.linkedlist.LinkedListTreeFactory;
+import org.neurpheus.collections.tree.util.TreeHelper;
+import org.neurpheus.core.io.FilePath2Object;
+import org.neurpheus.core.io.Object2FilePath;
+import org.neurpheus.machinelearning.neuralnet.NeuralNetwork;
+import org.neurpheus.machinelearning.neuralnet.NeuralNetworkException;
+import org.neurpheus.machinelearning.neuralnet.impl.NeuralNetworkImpl;
+import org.neurpheus.machinelearning.training.BaseTrainer;
+import org.neurpheus.machinelearning.training.FileTrainingSet;
+import org.neurpheus.machinelearning.training.MemoryTrainingSet;
+import org.neurpheus.machinelearning.training.Trainer;
+import org.neurpheus.machinelearning.training.TrainingExample;
+import org.neurpheus.machinelearning.training.TrainingException;
+import org.neurpheus.machinelearning.training.TrainingSet;
+import org.neurpheus.machinelearning.training.TrainingSetException;
+import org.neurpheus.machinelearning.training.TrainingSetUtils;
+import org.neurpheus.machinelearning.training.gui.TrainingProgressListener;
+import org.neurpheus.nlp.morphology.BaseFormsDictionary;
+import org.neurpheus.nlp.morphology.DefaultMorphologyFactory;
+import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
+import org.neurpheus.nlp.morphology.MorphologicalAnalysisResult;
+import org.neurpheus.nlp.morphology.MorphologyException;
+import org.neurpheus.nlp.morphology.VowelCharactersImpl;
+import org.neurpheus.nlp.morphology.baseimpl.GrammaticalPropertiesListImpl;
+import org.neurpheus.nlp.morphology.builder.xml.Replacement;
+import org.neurpheus.nlp.morphology.builder.xml.TaggingInfo;
+import org.neurpheus.nlp.morphology.impl.CompactBaseFormsDictionary;
+import org.neurpheus.nlp.morphology.impl.ExtendedMorphologicalAnalysisResult;
+import org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl;
+import org.neurpheus.nlp.morphology.impl.SimpleBaseFormsDictionary;
+import org.neurpheus.nlp.morphology.impl.xml.MorphologicalAnalyserInfo;
+import org.neurpheus.nlp.morphology.impl.xml.MorphologicalAnalysers;
+import org.neurpheus.nlp.morphology.impl.xml.SupportedLocales;
+import org.neurpheus.nlp.morphology.inflection.FormPattern;
+import org.neurpheus.nlp.morphology.inflection.InflectionPatternsBase;
+import org.neurpheus.nlp.morphology.inflection.XMLInflectionPatternBaseHelper;
+import org.neurpheus.nlp.morphology.tagset.GrammaticalPropertiesList;
+import org.neurpheus.nlp.morphology.tagset.Tagset;
+import org.neurpheus.nlp.myspell.FullDictionaryWriter;
+import org.neurpheus.nlp.myspell.MySpellDictionary;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
@@ -38,52 +84,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import org.apache.log4j.Logger;
-import org.neurpheus.classification.neuralnet.NeuralNetwork;
-import org.neurpheus.classification.neuralnet.NeuralNetworkException;
-import org.neurpheus.classification.neuralnet.impl.NeuralNetworkImpl;
-import org.neurpheus.classification.training.BaseTrainer;
-import org.neurpheus.classification.training.FileTrainingSet;
-import org.neurpheus.classification.training.MemoryTrainingSet;
-import org.neurpheus.classification.training.Trainer;
-import org.neurpheus.classification.training.TrainingExample;
-import org.neurpheus.classification.training.TrainingException;
-import org.neurpheus.classification.training.TrainingSet;
-import org.neurpheus.classification.training.TrainingSetException;
-import org.neurpheus.classification.training.TrainingSetUtils;
-import org.neurpheus.classification.training.gui.TrainingProgressListener;
-import org.neurpheus.collections.hashing.BloomFilter;
-import org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl;
-import org.neurpheus.nlp.myspell.MySpellDictionary;
-import org.neurpheus.nlp.morphology.inflection.InflectionPatternsBase;
-import org.neurpheus.nlp.myspell.FullDictionaryWriter;
-import org.neurpheus.nlp.morphology.VowelCharactersImpl;
-import org.neurpheus.collections.tree.Tree;
-import org.neurpheus.collections.tree.linkedlist.LinkedListTree;
-import org.neurpheus.collections.tree.linkedlist.LinkedListTreeFactory;
-import org.neurpheus.collections.tree.util.TreeHelper;
-import org.neurpheus.core.io.FilePath2Object;
-import org.neurpheus.core.io.Object2FilePath;
-import org.neurpheus.nlp.morphology.BaseFormsDictionary;
-import org.neurpheus.nlp.morphology.DefaultMorphologyFactory;
-import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
-import org.neurpheus.nlp.morphology.MorphologicalAnalysisResult;
-import org.neurpheus.nlp.morphology.MorphologyException;
-import org.neurpheus.nlp.morphology.baseimpl.GrammaticalPropertiesListImpl;
-import org.neurpheus.nlp.morphology.builder.xml.Replacement;
-import org.neurpheus.nlp.morphology.builder.xml.TaggingInfo;
-import org.neurpheus.nlp.morphology.impl.CompactBaseFormsDictionary;
-import org.neurpheus.nlp.morphology.impl.ExtendedMorphologicalAnalysisResult;
-import org.neurpheus.nlp.morphology.impl.SimpleBaseFormsDictionary;
-import org.neurpheus.nlp.morphology.impl.xml.MorphologicalAnalyserInfo;
-import org.neurpheus.nlp.morphology.impl.xml.MorphologicalAnalysers;
-import org.neurpheus.nlp.morphology.impl.xml.SupportedLocales;
-import org.neurpheus.nlp.morphology.inflection.FormPattern;
-import org.neurpheus.nlp.morphology.inflection.XMLInflectionPatternBaseHelper;
-import org.neurpheus.nlp.morphology.tagset.GrammaticalPropertiesList;
-import org.neurpheus.nlp.morphology.tagset.Tagset;
+import org.neurpheus.core.charset.DynamicCharset;
 
 /**
  * Generates a morphological analyser from a MySpell dictionary.
@@ -93,7 +98,7 @@ import org.neurpheus.nlp.morphology.tagset.Tagset;
 public final class MorphologicalAnalyserBuilder implements Runnable {
     
     /** The logger used by this class. */
-    private static Logger logger = Logger.getLogger(MorphologicalAnalyserBuilder.class);
+    private static Logger logger = Logger.getLogger(MorphologicalAnalyserBuilder.class.getName());
     private static Thread processingThread;
 
     public static NeuralNetworkLearningProperties getNeuralNetworkLearningProperties() {
@@ -358,7 +363,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     reader.close();
                 } catch (IOException ex) {
-                    logger.warn("Cannot close stream", ex);
+                    logger.log(Level.WARNING, "Cannot close stream", ex);
                 }
             }
         }
@@ -478,7 +483,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     reader.close();
                 } catch (IOException ex) {
-                    logger.warn("Cannot close stream", ex);
+                    logger.log(Level.WARNING, "Cannot close stream", ex);
                 }
             }
         }
@@ -550,7 +555,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
             try {
                 in.close();
             } catch (IOException e) {
-                logger.error("Cannot properly close input stream.", e);
+                logger.log(Level.SEVERE, "Cannot properly close input stream.", e);
             }
         }
         
@@ -647,7 +652,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     in.close();
                 } catch (IOException e) {
-                    logger.warn("Cannot close stream.", e);
+                    logger.log(Level.WARNING, "Cannot close stream.", e);
                 }
             }
 
@@ -812,7 +817,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     in.close();
                 } catch (IOException e) {
-                    logger.error("Cannot close stream", e);
+                    logger.log(Level.SEVERE, "Cannot close stream", e);
                 }
             }
         }
@@ -928,7 +933,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      *
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
-    public static void createAnalyser() throws MorphologicalAnalyserBuildException {
+    public static void createAnalyser(DynamicCharset charset) throws MorphologicalAnalyserBuildException {
         logger.info("STEP " + STEP_CREATE_ANALYSER
                 + " (CREATE ANALYSER) started.");
         
@@ -963,7 +968,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
         Tree tree = InflectionTreeBuilder.buildTree(ipb, dict);
         logger.info("Inflection tree compression.");
         LinkedListTreeFactory factory = LinkedListTreeFactory.getInstance();
-        tree = factory.createTree(tree, true, true);
+        tree = factory.createTree(tree, true, true, false);
 
 
         // Save the inflection tree.
@@ -990,6 +995,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
         
         // create analyser
         MorphologicalAnalyserImpl analyser = new MorphologicalAnalyserImpl();
+        analyser.setCharset(charset);
         
         // change weights of inflection patterns
         // and determine a number of inflection patterns involved in the nerual network processing
@@ -1121,8 +1127,8 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                         }
                     }
                     number++;
-                    if (logger.isDebugEnabled() && (number % numberOfLinesBetweenInfoMessages == 0)) {
-                        logger.debug("Number of processed words : " + number);
+                    if (logger.isLoggable(Level.FINE) && (number % numberOfLinesBetweenInfoMessages == 0)) {
+                        logger.fine("Number of processed words : " + number);
                     }
                 }
             } while (line != null);
@@ -1133,7 +1139,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     reader.close();
                 } catch (IOException e) {
-                    logger.error("Cannot properly close input stream.", e);
+                    logger.log(Level.SEVERE, "Cannot properly close input stream.", e);
                 }
             }
         }
@@ -1154,7 +1160,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
         try {
             trainingSet.close();
         } catch (TrainingSetException e) {
-            logger.warn("Cannot close training set.", e);
+            logger.log(Level.WARNING, "Cannot close training set.", e);
         }
             
         
@@ -1183,7 +1189,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     out.close();
                 } catch (IOException ioe) {
-                    logger.error("Cannot close CSV stream.", ioe);
+                    logger.log(Level.SEVERE, "Cannot close CSV stream.", ioe);
                 }
             }
         }
@@ -1386,7 +1392,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
 //            if (x >= START_ITERATION_NUMBER) {
 //                System.out.println("Start neurons network learn with eta = "+eta);
 //                quality = stemmerNeuralLearn(stemmer, trainingSet, eta, alfa);
-//                System.out.println(" Neurons net quality = "+quality);//+" ; w tym ¼le tworzonych form wyrazów = "+100.0*wrongFormsCount/testCount
+//                System.out.println(" Neurons net quality = "+quality);//+" ; w tym Ä½le tworzonych form wyrazÃ³w = "+100.0*wrongFormsCount/testCount
 //                try{
 //                    stemmer.write(PATH_STEMMER);
 //                } catch (IOException e){
@@ -1444,16 +1450,16 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                                     try {
                                         result = analyser.analyse(form);
                                         if (result.length == 0) {
-                                            logger.error("There is no result for form : " + form);
+                                            logger.log(Level.SEVERE, "There is no result for form : " + form);
                                         } else {
                                             topWords.put(form, Arrays.asList(result));
                                         }
                                         if (result[0].getAccuracy() != MorphologicalAnalyserImpl.PERFECT_MATCHING_WEIGHT) {
-                                            logger.warn("There is no dictionary entry for the form [" + form 
+                                            logger.log(Level.WARNING, "There is no dictionary entry for the form [" + form 
                                                     + "] which is very popular.");
                                         }
                                     } catch (MorphologyException ex) {
-                                        logger.error("Error while analysing form : " + form, ex);
+                                        logger.log(Level.SEVERE, "Error while analysing form : " + form, ex);
                                     }
                                 }
                             }
@@ -1467,7 +1473,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                     try {
                         reader.close();
                     } catch (IOException ex) {
-                        logger.warn("Cannot close reader", ex);
+                        logger.log(Level.WARNING, "Cannot close reader", ex);
                     }
                 }
             }
@@ -1530,7 +1536,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     zos.close();
                 } catch (IOException ex) {
-                    logger.warn("Cannot close stream", ex);
+                    logger.log(Level.WARNING, "Cannot close stream", ex);
                 }
             }
         }
@@ -1637,17 +1643,17 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                                 errorStatistic.put(code, count);
                             }
                             
-                            if (logger.isDebugEnabled()) {
-                                logger.debug("Bad analysis: " +  form + " -> " + 
+                            if (logger.isLoggable(Level.FINE)) {
+                                logger.fine("Bad analysis: " +  form + " -> " + 
                                         ((ExtendedMorphologicalAnalysisResult) result.get(0)).getForm());
                             }
                         }
                     }
                     number++;
-                    if (logger.isDebugEnabled() && (number % numberOfLinesBetweenInfoMessages == 0)) {
-                        logger.debug("Number of processed words : " + number);
+                    if (logger.isLoggable(Level.FINE) && (number % numberOfLinesBetweenInfoMessages == 0)) {
+                        logger.fine("Number of processed words : " + number);
                     }
-                    if (logger.isInfoEnabled() && (number % numberOfLinesBetweenInfoMessages == 0)) {
+                    if (logger.isLoggable(Level.INFO) && (number % numberOfLinesBetweenInfoMessages == 0)) {
                         if (allFormsCount > 0) {
                             logger.info(" Accurracy: " + 100.0 * ((double) correctFormsCount) / allFormsCount + "%");
                         }
@@ -1704,7 +1710,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 try {
                     reader.close();
                 } catch (IOException e) {
-                    logger.error("Cannot properly close input stream.", e);
+                    logger.log(Level.SEVERE, "Cannot properly close input stream.", e);
                 }
             }
         }
@@ -1731,7 +1737,9 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void processLanguage() throws MorphologicalAnalyserBuildException {
-        vowels = new VowelCharactersImpl(language);
+        DynamicCharset charset = new DynamicCharset("international", new String[0]);
+        charset.setInternational();
+        vowels = new VowelCharactersImpl(language, charset);
         if (isStepExecuted(STEP_GENERATE_FULL_DICTIONARY)) {
             if (symbol.startsWith("full_")) {
                 regenerateFullDictionary();
@@ -1752,7 +1760,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
             determineCorePatterns();
         }
         if (isStepExecuted(STEP_CREATE_ANALYSER)) {
-            createAnalyser();
+            createAnalyser(charset);
         }
         if (isStepExecuted(STEP_CREATE_TRAINING_SET)) {
             createTrainingSet();
@@ -1790,7 +1798,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
             try {
                 processLanguage();
             } catch (MorphologicalAnalyserBuildException e) {
-                logger.error("Cannot process dictionary " + symbol
+                logger.log(Level.SEVERE, "Cannot process dictionary " + symbol
                         + ". The processing exception occurred.", e);
             }
         }
@@ -1800,7 +1808,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
         try {
             processLanguage();
         } catch (MorphologicalAnalyserBuildException e) {
-            logger.error("Cannot process dictionary " + symbol
+            logger.log(Level.SEVERE, "Cannot process dictionary " + symbol
                     + ". The processing exception occurred.", e);
         }
     }

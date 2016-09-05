@@ -11,7 +11,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.log4j.Logger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.neurpheus.collections.array.CompactArray;
 import org.neurpheus.core.charset.DynamicCharset;
 import org.neurpheus.nlp.morphology.baseimpl.TagsetImpl;
@@ -24,7 +25,7 @@ import org.neurpheus.nlp.morphology.tagset.Tagset;
  */
 public class InflectionPatternWriterCache {
 
-    private final static Logger logger = Logger.getLogger(InflectionPatternWriterCache.class);
+    private final static Logger logger = Logger.getLogger(InflectionPatternWriterCache.class.getName());
 
     public Map dictionary;
     public CompactArray fpDefArray;
@@ -100,9 +101,9 @@ public class InflectionPatternWriterCache {
         fpDefArray = null;
 
 
-        if (logger.isDebugEnabled()) {
+        if (logger.isLoggable(Level.FINE)) {
             double time = (java.lang.System.nanoTime() - duration) / 1000000.0;
-            logger.debug("   inflection pattern writer cache read in " + time + " ms");
+            logger.fine("   inflection pattern writer cache read in " + time + " ms");
         }
 
     }

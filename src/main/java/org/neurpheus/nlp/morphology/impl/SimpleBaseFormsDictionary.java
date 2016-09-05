@@ -34,11 +34,11 @@ import org.neurpheus.nlp.morphology.inflection.InflectionPatternsMap;
 public class SimpleBaseFormsDictionary implements BaseFormsDictionary {
     
     /** Holds a mapping between base forms and inflection patterns of these forms. */
-    private HashMap mapping;
+    private Map<String, ExtendedInflectionPattern[]> mapping;
     
     /** Creates a new instance of SimpleBaseFormsDictionary. */
     public SimpleBaseFormsDictionary() {
-        mapping = new HashMap();
+        mapping = new HashMap<>();
     }
     
     /**
@@ -48,7 +48,7 @@ public class SimpleBaseFormsDictionary implements BaseFormsDictionary {
      * @param ip The inflectio pattern of the given lexeme.
      */
     public void addBaseForm(final String baseForm, final ExtendedInflectionPattern ip) {
-        ExtendedInflectionPattern[] ipa = (ExtendedInflectionPattern[]) mapping.get(baseForm);
+        ExtendedInflectionPattern[] ipa = mapping.get(baseForm);
         if (ipa != null) {
             for (int i = 0; i < ipa.length; i++) {
                 if (ipa[0] == ip) {
@@ -73,7 +73,7 @@ public class SimpleBaseFormsDictionary implements BaseFormsDictionary {
      * @return <code>true</code> if the given form exists in the dictionary.
      */
     public boolean contains(final String baseForm) {
-        return mapping.get(baseForm) != null;
+        return mapping.containsKey(baseForm);
     }
 
     /**
@@ -81,7 +81,7 @@ public class SimpleBaseFormsDictionary implements BaseFormsDictionary {
      *
      * @return A collection of base forms in a particular language.
      */
-    public Collection getBaseForms() {
+    public Collection<String> getBaseForms() {
         return mapping.keySet();
     }
     
@@ -94,7 +94,7 @@ public class SimpleBaseFormsDictionary implements BaseFormsDictionary {
      * @return         An array of inflection patterns related with the given lexeme.
      */
     public ExtendedInflectionPattern[] getInflectionPatterns(final String baseForm) {
-        return (ExtendedInflectionPattern[]) mapping.get(baseForm); 
+        return mapping.get(baseForm); 
     }
 
     /**
@@ -103,7 +103,11 @@ public class SimpleBaseFormsDictionary implements BaseFormsDictionary {
      * @return The IP mapping.
      */
     public InflectionPatternsMap getInflectionPatternsMap() {
-        throw new UnsupportedOperationException();
+        InflectionPatternsMap result = new InflectionPatternsMap();
+        for (ExtendedInflectionPattern[] patterns : mapping.values()) {
+            result.add(patterns);
+        }
+        return result;
     }
 
     /**
@@ -112,7 +116,7 @@ public class SimpleBaseFormsDictionary implements BaseFormsDictionary {
      * @param   newIPMap    The new IP mapping.
      */
     public void setInflectionPatternsMap(final InflectionPatternsMap newIPMap) {
-        throw new UnsupportedOperationException();
+        // do nothing 
     }
 
     /**

@@ -15,10 +15,13 @@
  */
 package org.neurpheus.nlp.morphology;
 
-import org.neurpheus.nlp.morphology.*;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.util.Arrays;
 import java.util.Locale;
-import org.neurpheus.core.string.MutableString;
+import org.neurpheus.core.charset.DynamicCharset;
+import org.neurpheus.core.charset.DynamicCharsetDecoder;
+import org.neurpheus.core.charset.DynamicCharsetProvider;
 
 /**
  *  This class checks if a given character is a vowel or consonant in a given language.
@@ -64,11 +67,11 @@ public class VowelCharactersImpl implements VowelCharacters {
      * @param language    A language for which this class 
      *                    will supports the checking of vowel characters.
      */
-    public VowelCharactersImpl(final Locale language) {
+    public VowelCharactersImpl(final Locale language, DynamicCharset charset) {
         if (language.getLanguage().equals("pl")) {
-            init(POLISH_VOWEL_CHARACTERS);
+            init(POLISH_VOWEL_CHARACTERS, charset);
         } else {
-            init(DEFAULT_VOWEL_CHARACTERS);
+            init(DEFAULT_VOWEL_CHARACTERS, charset);
         }
     }
     
@@ -77,7 +80,7 @@ public class VowelCharactersImpl implements VowelCharacters {
      *
      *  @param  vowelCharacters     the string of vowel characters in a specific language.
      */
-    private void init(final String vowelCharacters) {
+    private void init(final String vowelCharacters, final DynamicCharset charset) {
         char lastChar = 0;
         byte lastByte = 0;
         for (int i = vowelCharacters.length() - 1; i >= 0; i--) {
@@ -85,7 +88,7 @@ public class VowelCharactersImpl implements VowelCharacters {
             if (c > lastChar) {
                 lastChar = c;
             }
-            byte b = MutableString.getByte(c);
+            byte b = charset.fastEncode(c);
             if (b > lastByte) {
                 lastByte = b;
             }
@@ -97,15 +100,15 @@ public class VowelCharactersImpl implements VowelCharacters {
         for (int i = vowelCharacters.length() - 1; i >= 0; i--) {
             char c = vowelCharacters.charAt(i);
             charFlags[c] = true;
-            byte b = MutableString.getByte(c);
+            byte b = charset.fastEncode(c);
             if (b >= 0) {
                 byteFlags[b] = true;
             }
         }
         vowelSign = '$';
-        vowelSignCode = MutableString.getByte(vowelSign);
+        vowelSignCode = charset.fastEncode(vowelSign);
         consonantSign = '#';
-        consonantSignCode = MutableString.getByte(consonantSign);
+        consonantSignCode = charset.fastEncode(consonantSign);
         
     }
     

@@ -5,7 +5,7 @@
 
 package org.neurpheus.nlp.morphology.builder;
 
-import org.neurpheus.classification.neuralnet.xml.XmlNeuralNetwork;
+import org.neurpheus.machinelearning.neuralnet.xml.XmlNeuralNetwork;
 
 /**
  *

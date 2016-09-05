@@ -17,7 +17,6 @@ package org.neurpheus.nlp.morphology.util;
 
 import junit.framework.*;
 import org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuildHelper;
-import org.neurpheus.core.string.MutableString;
 
 
 /**

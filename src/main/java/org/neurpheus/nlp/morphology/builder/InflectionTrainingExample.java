@@ -13,7 +13,18 @@
  *  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
  *  for more details.
  */
+
 package org.neurpheus.nlp.morphology.builder;
+
+import org.neurpheus.machinelearning.classification.ClassificationResult;
+import org.neurpheus.machinelearning.classification.Classifier;
+import org.neurpheus.machinelearning.neuralnet.NeuralNetwork;
+import org.neurpheus.machinelearning.training.TrainingExample;
+import org.neurpheus.machinelearning.training.TrainingExampleFactory;
+import org.neurpheus.machinelearning.training.TrainingSetException;
+import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
+import org.neurpheus.nlp.morphology.impl.ExtendedMorphologicalAnalysisResult;
+import org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -24,53 +35,45 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import org.apache.log4j.Logger;
-import org.neurpheus.classification.ClassificationResult;
-import org.neurpheus.classification.Classifier;
-import org.neurpheus.classification.neuralnet.NeuralNetwork;
-import org.neurpheus.classification.training.TrainingExample;
-import org.neurpheus.classification.training.TrainingExampleFactory;
-import org.neurpheus.classification.training.TrainingSetException;
-import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
-import org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl;
-import org.neurpheus.nlp.morphology.impl.ExtendedMorphologicalAnalysisResult;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Represents a single training example for a neural network which selects inflection patterns.
  *
  * @author Jakub Strychowski
  */
-public class InflectionTrainingExample implements Serializable, TrainingExample, TrainingExampleFactory {
-    
-    
+public class InflectionTrainingExample implements Serializable, TrainingExample,
+        TrainingExampleFactory {
+
     /** The logger for this class. */
-    private static Logger logger = Logger.getLogger(InflectionTrainingExample.class);
-    
+    private static Logger logger = Logger.getLogger(InflectionTrainingExample.class.getName());
+
     /** Unique serialization identifier of this class. */
     static final long serialVersionUID = 770608061101180213L;
-    
+
     private int[] activatedNeuronIds;
     private double[] activationWeights;
     private int resultNeuronId;
     private int categoriesCount;
-    
+
     /** Creates a new instance of TrainingExample */
     public InflectionTrainingExample() {
     }
-    
+
     /** Creates a new instance of TrainingExample */
-    public InflectionTrainingExample(int[] indexes, double[] weights, 
-            int resultIndex, int numberOfCategories) {
+    public InflectionTrainingExample(int[] indexes, double[] weights,
+                                     int resultIndex, int numberOfCategories) {
         activatedNeuronIds = indexes;
         activationWeights = weights;
         resultNeuronId = resultIndex;
         categoriesCount = numberOfCategories;
     }
-    
+
     public static InflectionTrainingExample createTrainingExample(
-            final String wordForm, final List analysisResult, 
+            final String wordForm, final List analysisResult,
             final ExtendedInflectionPattern correctResult, final int maxIPId) {
-        
+
         // if the list contains only one element training is unnecessary.
         if (analysisResult.size() == 1) {
             return null;
@@ -79,11 +82,12 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
         if (((ExtendedMorphologicalAnalysisResult) analysisResult.get(0)).getAccuracy() == MorphologicalAnalyserImpl.PERFECT_MATCHING_WEIGHT) {
             return null;
         }
-        
+
         int count = 0;
         boolean extraNeuronActivated = false;
         for (final Iterator it = analysisResult.iterator(); it.hasNext();) {
-            ExtendedInflectionPattern ip = ((ExtendedMorphologicalAnalysisResult) it.next()).getInflectionPattern();
+            ExtendedInflectionPattern ip = ((ExtendedMorphologicalAnalysisResult) it.next()).
+                    getInflectionPattern();
             int id = ip.getId();
             if (id > maxIPId) {
                 extraNeuronActivated = true;
@@ -103,10 +107,10 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
         if (extraNeuronActivated) {
             count++;
         }
-        
+
         int[] charInputs = new int[32];
         Arrays.fill(charInputs, 0);
-        
+
         for (int i = wordForm.length() - 1; i >= 0; i--) {
             int c = (wordForm.charAt(i)) & 0x1F;
             if (charInputs[c] == 0) {
@@ -114,14 +118,14 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
             }
             charInputs[c]++;
         }
-        
-        
+
         int[] ipIndexes = new int[count];
         double[] weights = new double[count];
         double extraNeuronWeight = 0;
         int index = 0;
         for (final Iterator it = analysisResult.iterator(); it.hasNext();) {
-            ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.next();
+            ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.
+                    next();
             ExtendedInflectionPattern ip = res.getInflectionPattern();
             int id = ip.getId();
             if (id > maxIPId) {
@@ -131,7 +135,7 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
                 weights[index] = res.getAccuracy();
                 index++;
             }
-            
+
 //            ExtendedInflectionPattern[] ipa = res.getIpa();
 //            for (int i = 0; i < ipa.length; i++) {
 //                int id = ipa[i].getId();
@@ -149,7 +153,7 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
             weights[index] = extraNeuronWeight;
             index++;
         }
-        
+
         for (int i = 0; i < charInputs.length; i++) {
             if (charInputs[i] > 0) {
                 ipIndexes[index] = maxIPId + 2 + i;
@@ -157,32 +161,31 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
                 index++;
             }
         }
-        
-        
+
         int resNeuronId = correctResult.getId();
         if (resNeuronId > maxIPId) {
             resNeuronId = maxIPId + 1;
-        } 
-        
+        }
+
         return new InflectionTrainingExample(ipIndexes, weights, resNeuronId, maxIPId + 2);
     }
-    
+
     public void activate(double[] inputs) {
-        for (int i = activatedNeuronIds.length - 1; i>= 0; i--) {
-            inputs[activatedNeuronIds[i]] = activationWeights[i] ;
+        for (int i = activatedNeuronIds.length - 1; i >= 0; i--) {
+            inputs[activatedNeuronIds[i]] = activationWeights[i];
         }
         //outputs[resultNeuronId] = NeuralNetworkLayerImplOld.maxValue * 0.9;
     }
-    
+
     public boolean isCorrect(int selectedNeuronId) {
         return resultNeuronId == selectedNeuronId;
     }
-    
+
     /**
      * Activates the given classifier with input arguments represented by this training example.
      *
-     * @param classifier    The classifier which perform classification using input arguments represented
-     *                      by this training example.
+     * @param classifier The classifier which perform classification using input arguments
+     *                   represented by this training example.
      *
      * @throws TrainingSetException if this training example does not support the given classifier.
      */
@@ -191,18 +194,20 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
             NeuralNetwork ann = (NeuralNetwork) classifier;
             activate(ann.getInputs());
         } else {
-            throw new TrainingSetException("The given classifier is not supported by this training example");
+            throw new TrainingSetException(
+                    "The given classifier is not supported by this training example");
         }
     }
-    
+
     /**
      * Checks if the given classification result is a correct result for this training example.
      *
-     * @param result    The result of a classification.
+     * @param result The result of a classification.
      *
      * @return <code>true</code> if the given classification result is correct.
      *
-     * @throws TrainingSetException if this training example does not support the type of the given result.
+     * @throws TrainingSetException if this training example does not support the type of the given
+     *                              result.
      */
     public boolean isCorrect(final Object result) throws TrainingSetException {
         if (result instanceof List) {
@@ -221,10 +226,10 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
             return false;
         }
     }
-    
+
     /** Holds the buffer size for the {@link #getData()} method. */
     private static int maxDataSize = 32;
-    
+
     /**
      * Returns the data stored in this raining example in the form of array of bytes.
      *
@@ -253,11 +258,11 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
             }
             return result;
         } catch (IOException e) {
-            logger.error("Cannot serialize training example into array of bytes.", e);
+            logger.log(Level.SEVERE, "Cannot serialize training example into array of bytes.", e);
             return null;
         }
     }
-    
+
     /**
      * Creates an instance of training example from the given data.
      *
@@ -290,8 +295,7 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
                 activatedNeuronIds, activationWeights, resultNeuronId, categoriesCount);
         return result;
     }
-    
-    
+
     /**
      * Returns a tuple describing an object represented by this training example.
      *
@@ -307,7 +311,7 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
         }
         return res;
     }
-    
+
     /**
      * Returns an object representing a category of this training example.
      *
@@ -316,5 +320,5 @@ public class InflectionTrainingExample implements Serializable, TrainingExample,
     public Object getCategory() {
         return new Integer(resultNeuronId);
     }
-    
+
 }

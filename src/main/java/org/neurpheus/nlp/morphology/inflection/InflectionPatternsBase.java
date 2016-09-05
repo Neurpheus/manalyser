@@ -31,12 +31,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.apache.log4j.Logger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.neurpheus.core.io.DataOutputStreamPacker;
 import org.neurpheus.nlp.morphology.BaseFormsDictionary;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
@@ -52,7 +52,7 @@ import org.neurpheus.nlp.morphology.tagset.Tagset;
 public class InflectionPatternsBase implements Serializable {
     
     /** Holds the logger of this class. */
-    private static Logger logger = Logger.getLogger(InflectionPatternsBase.class);
+    private static Logger logger = Logger.getLogger(InflectionPatternsBase.class.getName());
     
     /** Unique serialization identifier of this class. */
     static final long serialVersionUID = 770608060903220146L;
@@ -381,15 +381,15 @@ public class InflectionPatternsBase implements Serializable {
             line = reader.readLine();
             if (line != null && line.trim().length() > 0) {
                 line = line.trim();
-                if (logger.isDebugEnabled()) {
-                    logger.debug("Processing line : " + line);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Processing line : " + line);
                 }
                 ExtendedInflectionPattern ip = ipb.addInflectionPattern(line);
                 int pos = line.indexOf(' ');
                 dict.addBaseForm(pos < 0 ? line : line.substring(0, pos), ip);
                 number++;
-                if (logger.isDebugEnabled() && (number % numberOfLinesBetweenInfoMessages == 0)) {
-                    logger.debug("Number of processed words : " + number);
+                if (logger.isLoggable(Level.FINE) && (number % numberOfLinesBetweenInfoMessages == 0)) {
+                    logger.fine("Number of processed words : " + number);
                 }
             }
         } while (line != null);
@@ -546,8 +546,8 @@ public class InflectionPatternsBase implements Serializable {
         for (Iterator it = getInflectionPatterns().iterator(); it.hasNext(); number++) {
             ExtendedInflectionPattern ip = (ExtendedInflectionPattern) it.next();
             ip.determineCorePatterns(vowels);
-            if (logger.isDebugEnabled() && (number % numberOfIPsBetweenInfoMessage == 0)) {
-                logger.debug("Number of processed inflection patterns : " + number);
+            if (logger.isLoggable(Level.FINE) && (number % numberOfIPsBetweenInfoMessage == 0)) {
+                logger.fine("Number of processed inflection patterns : " + number);
             }
         }
     }
@@ -769,8 +769,8 @@ public class InflectionPatternsBase implements Serializable {
     }
 
     public void read(final DataInputStream in) throws IOException {
-        if (logger.isDebugEnabled()) {
-            logger.debug("Reading inflection pattern base...");
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Reading inflection pattern base...");
         }
         long duration = java.lang.System.nanoTime();
         language = new Locale(DataOutputStreamPacker.readString(in));
@@ -808,9 +808,9 @@ public class InflectionPatternsBase implements Serializable {
             }
             TagsetImpl.setDeserializationTagset(null);
         }
-        if (logger.isDebugEnabled()) {
+        if (logger.isLoggable(Level.FINE)) {
             double time = (java.lang.System.nanoTime() - duration) / 1000000.0;
-            logger.debug("Inflection pattern base read in " + time + " ms");
+            logger.fine("Inflection pattern base read in " + time + " ms");
         }
 
     }

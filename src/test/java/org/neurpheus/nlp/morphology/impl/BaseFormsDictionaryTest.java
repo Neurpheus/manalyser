@@ -2,7 +2,7 @@
  * BaseFormsDictionaryTest.java
  * JUnit based test
  *
- * Created on 27 sierpieñ 2006, 23:40
+ * Created on 27 sierpieÅ„ 2006, 23:40
  */
 
 package org.neurpheus.nlp.morphology.impl;
@@ -20,39 +20,41 @@ import org.neurpheus.nlp.morphology.inflection.InflectionPatternsMap;
  */
 public class BaseFormsDictionaryTest extends TestCase {
 
-    private static ExtendedInflectionPattern ipA = new InflectionPatternImpl("krowa krowy krowie krowami krowach", false, true);
-    private static ExtendedInflectionPattern ipB = new InflectionPatternImpl("bic bicie bili biliby bilibysmy bily", false, true);
-    private static ExtendedInflectionPattern ipC = new InflectionPatternImpl("kot kota kocie kotu kotami kotach koty", false, true);
-    private static ExtendedInflectionPattern ipD = new InflectionPatternImpl("niebieski niebieskiego niebieskiemu", false, true);
-    
-    
+    private static ExtendedInflectionPattern ipA = new InflectionPatternImpl(
+            "krowa krowy krowie krowami krowach", false, true);
+    private static ExtendedInflectionPattern ipB = new InflectionPatternImpl(
+            "bic bicie bili biliby bilibysmy bily", false, true);
+    private static ExtendedInflectionPattern ipC = new InflectionPatternImpl(
+            "kot kota kocie kotu kotami kotach koty", false, true);
+    private static ExtendedInflectionPattern ipD = new InflectionPatternImpl(
+            "niebieski niebieskiego niebieskiemu", false, true);
+
     public BaseFormsDictionaryTest(String testName) {
         super(testName);
     }
 
     private BaseFormsDictionary createDict(int pass) {
-        BaseFormsDictionary dict = new SimpleBaseFormsDictionary();
-        InflectionPatternsMap map = new InflectionPatternsMap();
-        dict.addBaseForm("abcdef", ipA);
-        dict.addBaseForm("abc", ipA);
-        dict.addBaseForm("abcdef", ipA);
-        dict.addBaseForm("abcdef", ipB);
-        dict.addBaseForm("fg", ipA);
-        dict.addBaseForm("fg", ipB);
-        dict.addBaseForm("fg", ipC);
-        dict.addBaseForm("fgabcdef", ipD);
-        
+        SimpleBaseFormsDictionary sdict = new SimpleBaseFormsDictionary();
+        BaseFormsDictionary result = sdict;
+        sdict.addBaseForm("abcdef", ipA);
+        sdict.addBaseForm("abc", ipA);
+        sdict.addBaseForm("abcdef", ipA);
+        sdict.addBaseForm("abcdef", ipB);
+        sdict.addBaseForm("fg", ipA);
+        sdict.addBaseForm("fg", ipB);
+        sdict.addBaseForm("fg", ipC);
+        sdict.addBaseForm("fgabcdef", ipD);
         if (pass == 1) {
-            dict = new CompactBaseFormsDictionary(dict, map);
+            InflectionPatternsMap imap = sdict.getInflectionPatternsMap();
+            result = new CompactBaseFormsDictionary(sdict, imap);
         }
-        
-        return dict;
+        return result;
     }
-    
+
     public void testDictionary() {
-        
+
         for (int pass = 0; pass < 2; pass++) {
-        
+
             BaseFormsDictionary dict = createDict(pass);
 
             Collection baseForms = dict.getBaseForms();
@@ -61,7 +63,6 @@ public class BaseFormsDictionaryTest extends TestCase {
             assertTrue(baseForms.contains("abc"));
             assertTrue(baseForms.contains("fg"));
             assertTrue(baseForms.contains("fgabcdef"));
-
 
             assertTrue(dict.contains("abcdef"));
             assertTrue(dict.contains("abc"));
@@ -96,10 +97,9 @@ public class BaseFormsDictionaryTest extends TestCase {
             assertNull(dict.getInflectionPatterns("ab"));
             assertNull(dict.getInflectionPatterns("a"));
             assertNull(dict.getInflectionPatterns(""));
-            
+
         }
-        
+
     }
 
-    
 }

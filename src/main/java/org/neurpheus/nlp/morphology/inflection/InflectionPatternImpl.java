@@ -14,6 +14,7 @@
  *  for more details.
  */
 package org.neurpheus.nlp.morphology.inflection;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -28,7 +29,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import org.apache.log4j.Logger;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import org.neurpheus.core.io.DataOutputStreamPacker;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
 import org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuildHelper;
@@ -36,89 +39,91 @@ import org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl;
 import org.neurpheus.nlp.morphology.VowelCharactersImpl;
 
 /**
- *  Represents an inflection pattern (IP).
- *  <p>
- *  An inflection patterns is a set of rules which allow to create any form of a lexeme (word)
- *  which is covered by this pattern. The inflection pattern consist of a set of morpheme groups
- *  called supplements. When a particular supplement is combined with the core of a lexeme,
- *  a particular form of the lexeme is created. A base supplement is a supplement which creates
- *  the base form of a lexeme (a lemma).
- *  </p>
- *  <p>
- *  An inflection pattern can hold also a collection of cores of lexemes which
- *  are covered by this IP. An IP holds also core patterns which represents
- *  similar cores covered by this IP.
- *  </p>
+ * Represents an inflection pattern (IP).
+ * <p>
+ * An inflection patterns is a set of rules which allow to create any form of a lexeme (word) which
+ * is covered by this pattern. The inflection pattern consist of a set of morpheme groups called
+ * supplements. When a particular supplement is combined with the core of a lexeme, a particular
+ * form of the lexeme is created. A base supplement is a supplement which creates the base form of a
+ * lexeme (a lemma).
+ * </p>
+ * <p>
+ * An inflection pattern can hold also a collection of cores of lexemes which are covered by this
+ * IP. An IP holds also core patterns which represents similar cores covered by this IP.
+ * </p>
  *
  * @author Jakub Strychowski
  */
 public class InflectionPatternImpl implements Comparable, ExtendedInflectionPattern, Serializable {
-    
+
     /** Unique serialization identifier of this class. */
     static final long serialVersionUID = 770608060903120420L;
-    
+
     /** Holds logger for this class. */
-    private static Logger logger = Logger.getLogger(InflectionPatternImpl.class);
-    
+    private static Logger logger = Logger.getLogger(InflectionPatternImpl.class.getName());
+
     /** Holds a base supplement of the inflection pattern. */
     private FormPattern baseFormPattern;
-    
+
     /** Holds all other supplements belonging to this inflection pattern. */
     private List otherFormPatterns;
-    
+
     /** Holds all cores covered by this inflection pattern as collection of Strings. */
     private Collection coveredCores;
-    
+
     /** Holds core patterns. */
     private Collection corePatterns;
-    
+
     /** Holds the number of lexemes covered by this pattern. */
     private int numberOfCoveredLexemes;
-    
+
     /**
-     * Holds the identifier of the inflection pattern.
-     * Identifier should be unique in the scope of an inflection patterns base holding this object.
+     * Holds the identifier of the inflection pattern. Identifier should be unique in the scope of
+     * an inflection patterns base holding this object.
      */
     private int id;
+
+    private static AtomicInteger idGenerator = new AtomicInteger();
     
     /**
      * Creates a new instance of InflectionPattern.
      */
     public InflectionPatternImpl() {
     }
-    
-    
+
     /**
      * Creates a new instance of InflectionPattern analysing given array of all forms of a lexeme.
      *
-     * @param forms             An array which contains all forms of a lexeme.
-     * @param acceptInfixes     if <code>true</code>, created inflection pattern can contain
-     *                          infixes in the supplements.
-     * @param acceptPrefixes    if <code>true</code>, created inflection pattern can contain
-     *                          prefioxes in the supplements.
+     * @param forms          An array which contains all forms of a lexeme.
+     * @param acceptInfixes  if <code>true</code>, created inflection pattern can contain infixes in
+     *                       the supplements.
+     * @param acceptPrefixes if <code>true</code>, created inflection pattern can contain prefioxes
+     *                       in the supplements.
      */
     public InflectionPatternImpl(
             final String[] forms, final boolean acceptInfixes, final boolean acceptPrefixes) {
         init(forms, acceptInfixes, acceptPrefixes);
     }
-    
+
     public InflectionPatternImpl(
             final String line, final boolean acceptInfixes, final boolean acceptPrefixes) {
-        String[] forms = line.split("\\w");
+        String[] forms = line.split("\\s");
         init(forms, acceptInfixes, acceptPrefixes);
+        
     }
-    
+
     /**
      * Initializes this inflection pattern analysing the given array of all forms of a lexeme.
      *
-     * @param forms             array which contains all forms of a word.
-     * @param acceptInfixes     if <code>true</code>, the inflection pattern can contain
-     *                          infixes in the supplements
-     * @param acceptPrefixes    if <code>true</code>, the inflection pattern can contain
-     *                          prefixes in the supplements
+     * @param forms          array which contains all forms of a word.
+     * @param acceptInfixes  if <code>true</code>, the inflection pattern can contain infixes in the
+     *                       supplements
+     * @param acceptPrefixes if <code>true</code>, the inflection pattern can contain prefixes in
+     *                       the supplements
      */
     private void init(
             final String[] forms, final boolean acceptInfixes, final boolean acceptPrefixes) {
+        id = idGenerator.getAndIncrement();
         HashSet tmp = new HashSet();
         coveredCores = new HashSet();
         corePatterns = new HashSet();
@@ -127,7 +132,8 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         // inflection pattern. This code determines also the base supplement and other supplements
         // which can be created from the forms and the determined core.
         if (forms.length > 0) {
-            String core = MorphologicalAnalyserBuildHelper.determineCore(forms, acceptInfixes, acceptPrefixes);
+            String core = MorphologicalAnalyserBuildHelper.determineCore(forms, acceptInfixes,
+                                                                         acceptPrefixes);
             coveredCores.add(core);
             for (int i = 0; i < forms.length; i++) {
                 String supp = MorphologicalAnalyserBuildHelper.getSupplement(forms[i], core);
@@ -145,21 +151,21 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         setOtherFormPatterns(tmp);
         numberOfCoveredLexemes = coveredCores.size();
     }
-    
+
     /**
-     *  Returns a set of cores covered by this inflection pattern.
+     * Returns a set of cores covered by this inflection pattern.
      *
      * @return a collection of String objects.
      */
     public Collection getCoveredCores() {
         return coveredCores;
     }
-    
+
     /**
-     *  Sets a set of cores covered by this inflection pattern.
+     * Sets a set of cores covered by this inflection pattern.
      *
-     * @param newCoveredCores  All known cores covered by this inflection pattern in the form
-     *                         of a Strings collection.
+     * @param newCoveredCores All known cores covered by this inflection pattern in the form of a
+     *                        Strings collection.
      */
     public void setCoveredCores(final Collection newCoveredCores) {
         coveredCores = newCoveredCores;
@@ -167,17 +173,17 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
             setNumberOfCoveredLexemes(coveredCores.size());
         }
     }
-    
+
     /**
-     * Returns an unique code of this inflection pattern.
-     * Two inflection patterns with the same code are merged in an inflection pattern base.
+     * Returns an unique code of this inflection pattern. Two inflection patterns with the same code
+     * are merged in an inflection pattern base.
      *
      * In this implementation the code consist of sorted supplements of this inflection pattern.
      *
      * @return The String object which represents this inflection patern.
      */
     public String getCode() {
-        StringBuffer res = new StringBuffer();
+        StringBuilder res = new StringBuilder();
         if (baseFormPattern != null) {
             res.append(baseFormPattern.getAffixes());
         }
@@ -188,7 +194,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         }
         return res.toString();
     }
-    
+
     /**
      * Returns a string containg all affixes from this pattern separated by space character.
      *
@@ -209,9 +215,9 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         }
         return res.toString();
     }
-    
+
     /**
-     *  Adds the given cores to the set of all known cores covered by this inflection pattern.
+     * Adds the given cores to the set of all known cores covered by this inflection pattern.
      *
      * @param newCores new cores covered by this inflection pattern.
      */
@@ -219,16 +225,15 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         coveredCores.addAll(newCores);
         setNumberOfCoveredLexemes(coveredCores.size());
     }
-    
-    
+
     /**
      * Compares this inflection pattern with other one.
      *
-     * @param   o   The inflection pattern which has to be compared with this object.
+     * @param o The inflection pattern which has to be compared with this object.
      *
-     * @return <code>0</code> if both inflection patterns are equal,
-     *      <code>1</code> if this pattern is before the given pattern in sort order, and
-     *      <code>-1</code> if this pattern if after the given pattern in sort order.
+     * @return <code>0</code> if both inflection patterns are equal, <code>1</code> if this pattern
+     *         is before the given pattern in sort order, and <code>-1</code> if this pattern if
+     *         after the given pattern in sort order.
      */
     public int compareTo(final Object o) {
         if (o != null && o instanceof ExtendedInflectionPattern) {
@@ -245,36 +250,36 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
             return -1;
         }
     }
-    
+
     /**
-     *  Uses this constant to convert fractions into values in percents.
+     * Uses this constant to convert fractions into values in percents.
      */
     private static final double CONVERT_TO_PERCENT = 100.0;
-    
+
     /**
-     *  Logs out the inflection pattern.
+     * Logs out the inflection pattern.
      *
-     * @param out           The output stream.
-     * @param withCores     if <code>true</code>, logs out also cores covered by
-     *                      this inflection pattern.
-     * @param number        The position of this inflection pattern.
-     * @param sumCores      The number of cores covered by already logged out inflection patterns.
-     * @param totalCores    The total number of cores.
+     * @param out        The output stream.
+     * @param withCores  if <code>true</code>, logs out also cores covered by this inflection
+     *                   pattern.
+     * @param number     The position of this inflection pattern.
+     * @param sumCores   The number of cores covered by already logged out inflection patterns.
+     * @param totalCores The total number of cores.
      */
     public void print(final PrintStream out, final boolean withCores,
-            final int number, final int sumCores, final int totalCores) {
-        
+                      final int number, final int sumCores, final int totalCores) {
+
         out.print(number);
         out.print(". ");
         out.print(toString());
         out.println();
-        
+
         int count = getNumberOfCoveredLexemes();
         out.println("number of covered lexemes : " + count + " -> "
                 + (CONVERT_TO_PERCENT * count / totalCores) + "%");
         out.println("number of lexemes covered by this an previous IPs : "
                 + (CONVERT_TO_PERCENT * (count + sumCores) / totalCores) + "%");
-        
+
         if (withCores) {
             out.print("cores of covered lexemes :");
             for (Iterator it = getCoveredCores().iterator(); it.hasNext();) {
@@ -283,7 +288,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
             }
             out.println();
         }
-        
+
         out.print("core patterns of covered lexemes : ");
         for (Iterator it = getCorePatterns().iterator(); it.hasNext();) {
             CorePattern cp = (CorePattern) it.next();
@@ -292,21 +297,21 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         }
         out.println();
     }
-    
+
     /**
-     * Returns a collection of supplements belonging to this
-     * inflection pattern without the bass supplement.
+     * Returns a collection of supplements belonging to this inflection pattern without the bass
+     * supplement.
      *
      * @return The collection of String objects.
      */
     public List getOtherFormPatterns() {
         return otherFormPatterns;
     }
-    
+
     /**
-     * Sets the set of the supplements (without the base supplement) which belong
-     * to this inflection pattern. This method should store supplements as a sorted list
-     * available by the {@link getOtherSupplements} method.
+     * Sets the set of the supplements (without the base supplement) which belong to this inflection
+     * pattern. This method should store supplements as a sorted list available by the
+     * {@link getOtherSupplements} method.
      *
      * @param newSupplements The collection of String objects.
      */
@@ -316,7 +321,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         tmp.trimToSize();
         otherFormPatterns = tmp;
     }
-    
+
     /**
      * Returns the base supplement of this inflection pattern.
      *
@@ -325,7 +330,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public FormPattern getBaseFormPattern() {
         return baseFormPattern;
     }
-    
+
     /**
      * Sets new base supplement for this inflection pattern.
      *
@@ -334,7 +339,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public void setBaseFormPattern(final String newBaseFormPattern) {
         baseFormPattern = new FormPattern(newBaseFormPattern);
     }
-    
+
     /**
      * Sets new base supplement for this inflection pattern.
      *
@@ -343,12 +348,11 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public void setBaseFormPattern(final FormPattern newBaseFormPattern) {
         baseFormPattern = newBaseFormPattern;
     }
-    
-    
+
     /**
-     * Returns all supplements of this inflection pattern (including a base supplement).
-     * The base supplements occurrs at the first position in the list.
-     * Other supplements are ordered alphabetically.
+     * Returns all supplements of this inflection pattern (including a base supplement). The base
+     * supplements occurrs at the first position in the list. Other supplements are ordered
+     * alphabetically.
      *
      * @return Collection of String objects.
      */
@@ -358,45 +362,42 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         res.addAll(otherFormPatterns);
         return res;
     }
-    
+
     /**
      * Determines core patterns analysing words covered by this inflection pattern.
      *
-     *  Patterns Determination Algorithm:
+     * Patterns Determination Algorithm:
      *
-     *  1.  Create an empty set R which will contain result patterns.
-     *  2.  Get list of cores wich will be analysed.
-     *  3.  If number of analysed words is too small, finish with empty result.
-     *  4.  Get as a current pattern, the pattern which covers all words (empty pattern)
-     *  5.  Find the best subset of patterns which can replace current pattern and add
-     *      all patterns from the subset to the result set.
-     *      Subset containng only one empty pattern is not allowed.
-     *  6.  Remove useless lemma paterns.
-     *  7.  Return the result.
+     * 1. Create an empty set R which will contain result patterns. 2. Get list of cores wich will
+     * be analysed. 3. If number of analysed words is too small, finish with empty result. 4. Get as
+     * a current pattern, the pattern which covers all words (empty pattern) 5. Find the best subset
+     * of patterns which can replace current pattern and add all patterns from the subset to the
+     * result set. Subset containng only one empty pattern is not allowed. 6. Remove useless lemma
+     * paterns. 7. Return the result.
      *
-     * @param   vowels  Represents the vowels of a natural language.
+     * @param vowels Represents the vowels of a natural language.
+     *
      * @return A set of strings.
      */
     public Set determineCorePatterns(final VowelCharactersImpl vowels) {
-        
+
         // 1.  Create an empty set R which will contain result patterns.
         Set result = new HashSet();
-        
+
         // 2.  Get list of words wich will be analysed.
         ArrayList cores = new ArrayList();
         cores.addAll(getCoveredCores());
-        
+
         // 3.  If number of analysed words is too small, finish with empty result.
         if (cores.size() <= 2) {
             return result;
         }
-        
+
         // 4.  Get as a current pattern, the pattern which covers all words ("*").
         CorePattern cp = new CorePattern();
         cp.setPattern("");
         cp.setWeight(cores.size());
-        
-        
+
         // 5.  Find the best subset of patterns which can replace current pattern and add
         //     all patterns from the subset to the result set.
         //     Subset containng only one empty pattern is not allowed.
@@ -404,111 +405,103 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         if (result.size() == 1 && result.contains(cp)) {
             result = Collections.EMPTY_SET;
         }
-        
-        
+
         setCorePatterns(result);
-        
-        
+
         // 6. Remove useless lemma patterns.
         removeUseless(vowels);
-        
+
         // 7.  Return the result.
         return result;
     }
-    
+
     /**
-     * Holds the maximum size of a subset which covers the same cores which are covered
-     * by the core pattern from with the subset was created. The size of a subset can be greated
-     * if a large set of cores is covered. In fact real number of elements in a subset
-     * cannot be greater then this parameter plus number of covered cores divaded
-     * by the CORES_PATTERN_SIZE_DIVIDE_BY parameter. */
+     * Holds the maximum size of a subset which covers the same cores which are covered by the core
+     * pattern from with the subset was created. The size of a subset can be greated if a large set
+     * of cores is covered. In fact real number of elements in a subset cannot be greater then this
+     * parameter plus number of covered cores divaded by the CORES_PATTERN_SIZE_DIVIDE_BY parameter. */
     private static final int MAXIMUM_SIZE_OF_CORE_PATTERNS_SUBSET = 20;
-    
+
     /**
-     * Holds the value by with the number of elements in a subset is divaded to check
-     * if the subset is not too specialized. See {@link MAXIMUM_SIZE_OF_CORE_PATTERNS_SUBSET).
+     * Holds the value by with the number of elements in a subset is divaded to check if the subset
+     * is not too specialized. See {@link MAXIMUM_SIZE_OF_CORE_PATTERNS_SUBSET).
      */
     private static final int CORES_PATTERN_SIZE_DIVIDE_BY = 1000;
-    
-    
+
     /**
-     * If a mean number of cores covered by a single core patterns in a subset is less then
-     * this parameter the subset is too specialized.
+     * If a mean number of cores covered by a single core patterns in a subset is less then this
+     * parameter the subset is too specialized.
      */
     private static final float MINIMUM_NUMBER_OF_CORES_COVERED_BY_SINGLE_PATERN_IN_SUBSET = 3.0f;
-    
+
     /**
-     *  If the size of a subset is greater then this value the mean number of cores
-     * covered by a single pattern from subset cannot be smaller then
-     * {@Link LONG_PATTERN_MEAN_COVERED_CORES} and patterns canno be longer then
-     * {@link LONG_PATTERN_LENGTH parameter}.
+     * If the size of a subset is greater then this value the mean number of cores covered by a
+     * single pattern from subset cannot be smaller then {@Link LONG_PATTERN_MEAN_COVERED_CORES} and
+     * patterns canno be longer then {@link LONG_PATTERN_LENGTH parameter}.
      */
     private static final int LONG_PATTERN_MAXIMUM_SIZE_OF_SUBSET = 4;
-    
+
     /**
-     * Maximum length of patterns for a subset having many elements.
-     * See {@link LONG_PATTERN_MAXIMUM_SIZE_OF_SUBSET}.
+     * Maximum length of patterns for a subset having many elements. See
+     * {@link LONG_PATTERN_MAXIMUM_SIZE_OF_SUBSET}.
      */
     private static final int LONG_PATTERN_LENGTH = 4;
-    
+
     /**
-     * Minmum number of cores covered by a single pattern in a subset having many elements.
-     * See {@link LONG_PATTERN_MAXIMUM_SIZE_OF_SUBSET}.
+     * Minmum number of cores covered by a single pattern in a subset having many elements. See
+     * {@link LONG_PATTERN_MAXIMUM_SIZE_OF_SUBSET}.
      */
     private static final float LONG_PATTERN_MEAN_COVERED_CORES = 4.0f;
-    
+
     /**
-     *  Finds the bes subset of paterns which effectivly replaces given pattern.
-     *  This method analysys given cores and tries to find the best set of
-     *  more specialised patterns which can replace the input pattern.
+     * Finds the bes subset of paterns which effectivly replaces given pattern. This method analysys
+     * given cores and tries to find the best set of more specialised patterns which can replace the
+     * input pattern.
      *
-     *  Following algorithm is used:
+     * Following algorithm is used:
      *
-     *  1.  Create an empty subset of patterns.
+     * 1. Create an empty subset of patterns.
      *
-     *  2.  For each analysed core do:
+     * 2. For each analysed core do:
      *
-     *    2.1.  If the analysed core is covered by the input pattern and is is possible
-     *          to create a new pattern which extends the input one, then:
+     * 2.1. If the analysed core is covered by the input pattern and is is possible to create a new
+     * pattern which extends the input one, then:
      *
-     *      2.1.1.  Create the new pattern adding one letter from the core to the input pattern.
+     * 2.1.1. Create the new pattern adding one letter from the core to the input pattern.
      *
-     *      2.1.2.  If the subset of patterns contains input pattern, increase the weight of
-     *              the pattern in the subset, if not, add new pattern to the subset.
+     * 2.1.2. If the subset of patterns contains input pattern, increase the weight of the pattern
+     * in the subset, if not, add new pattern to the subset.
      *
-     *  3.  Check if the created subset of patterns can effectivly replace current pattern.
-     *      The subset can replace the current pattern if current pattern dose not contain
-     *      any letter. The subset cannot replace the current pattern if one of the following
-     *      conditions is true :
+     * 3. Check if the created subset of patterns can effectivly replace current pattern. The subset
+     * can replace the current pattern if current pattern dose not contain any letter. The subset
+     * cannot replace the current pattern if one of the following conditions is true :
      *
-     *      3.a. An average number of cores covered by single pattern from the subset is
-     *           lower then 3.
-     *      3.b. Number of patterns in the subset is greater then 9.
-     *      3.c. Number of patterns in the subset is greater then 4 and an average number of cores
-     *           covered by single pattern from the subset is lower then 4.
-     *      3.d. Subset is empty.
+     * 3.a. An average number of cores covered by single pattern from the subset is lower then 3.
+     * 3.b. Number of patterns in the subset is greater then 9. 3.c. Number of patterns in the
+     * subset is greater then 4 and an average number of cores covered by single pattern from the
+     * subset is lower then 4. 3.d. Subset is empty.
      *
-     *  4. If the subset effectivly replaces the current pattern :
+     * 4. If the subset effectivly replaces the current pattern :
      *
-     *      4.1. Remove the current pattern form the result set
+     * 4.1. Remove the current pattern form the result set
      *
-     *      4.2. Add all patterns from the subset to the result set
+     * 4.2. Add all patterns from the subset to the result set
      *
-     *      4.3. For each pattern from the subset try to find its subset
+     * 4.3. For each pattern from the subset try to find its subset
      *
-     *  @param result the global set of result patterns
-     *  @param cp input pattern to replace
-     *  @param cores list of cores covered by the pattern
+     * @param result the global set of result patterns
+     * @param cp     input pattern to replace
+     * @param cores  list of cores covered by the pattern
      */
     private void findBestPatternSubset(
             final Set result, final CorePattern cp, final ArrayList cores) {
-        
+
         String pattern = cp.getPattern();
-        
+
         //  1.  Create an empty subset of patterns.
         int weightSum = 0;
         HashMap subset = new HashMap();
-        
+
         //  2.  For each analysed core do:
         for (Iterator it = cores.iterator(); it.hasNext();) {
             String core = (String) it.next();
@@ -516,16 +509,15 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
             //        to create a new pattern which extends the input one, then:
             if ((core.length() > pattern.length()) && (core.endsWith(pattern))) {
                 weightSum++;
-                
+
                 // 2.1.1.  Create the new pattern adding one letter from the core
                 // to the input pattern.
                 CorePattern newcp = new CorePattern();
-                String newPattern =
-                        core.substring(core.length() - pattern.length() - 1, core.length());
+                String newPattern
+                        = core.substring(core.length() - pattern.length() - 1, core.length());
                 newcp.setPattern(newPattern);
                 newcp.setWeight(1);
-                
-                
+
                 // 2.1.2.  If the subset of patterns contains input pattern, increase the weight of
                 //         the pattern in the subset, if not, add new pattern to the subset.
                 if (subset.containsKey(newPattern)) {
@@ -536,8 +528,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
                 }
             }
         }
-        
-        
+
         //  3.  Check if the created subset of patterns can effectivly replace current pattern.
         //      The subset can replace the current pattern if current pattern dose not contain
         //      any letter. The subset cannot replace the current pattern if one of the
@@ -560,17 +551,14 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
                 float medCores = ((float) (cp.getWeight())) / subset.size();
                 if (medCores < MINIMUM_NUMBER_OF_CORES_COVERED_BY_SINGLE_PATERN_IN_SUBSET) {
                     subsetRight = false;
-                } else {
-                    if (subset.size() > LONG_PATTERN_MAXIMUM_SIZE_OF_SUBSET
-                            && (medCores < LONG_PATTERN_MEAN_COVERED_CORES
-                            || pattern.length() >= LONG_PATTERN_LENGTH)) {
-                        subsetRight = false;
-                    }
+                } else if (subset.size() > LONG_PATTERN_MAXIMUM_SIZE_OF_SUBSET
+                        && (medCores < LONG_PATTERN_MEAN_COVERED_CORES
+                        || pattern.length() >= LONG_PATTERN_LENGTH)) {
+                    subsetRight = false;
                 }
             }
         }
-        
-        
+
         //  4. If the subset effectivly replaces the current pattern :
         if (subsetRight) {
             // 4.1. Remove the current pattern form the result set
@@ -583,14 +571,14 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
             }
         }
     }
-    
+
     /**
-     *  Removes lemmas and lemma patterns which are useless.
+     * Removes lemmas and lemma patterns which are useless.
      *
-     *  This method removes lemma patterns which covers less then two words.
-     *  After that, the method removes all lemmas covered by throws remaining lemma patterns.
-     *  Finall product og this algorithm is a set of lemma patterns and a set of lemmas
-     *  which are not covered by any lemma pattern.
+     * This method removes lemma patterns which covers less then two words. After that, the method
+     * removes all lemmas covered by throws remaining lemma patterns. Finall product og this
+     * algorithm is a set of lemma patterns and a set of lemmas which are not covered by any lemma
+     * pattern.
      *
      * @param vowels Represents the vowels in a natural language.
      */
@@ -599,8 +587,8 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         for (Iterator it = corePatterns.iterator(); it.hasNext();) {
             CorePattern lemmaPattern = (CorePattern) it.next();
             if (lemmaPattern.getWeight() <= 1) {
-                if (logger.isDebugEnabled()) {
-                    logger.debug("--- Removing lemma pattern : "
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("--- Removing lemma pattern : "
                             + lemmaPattern.getPattern().toString());
                 }
                 it.remove();
@@ -609,8 +597,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
             }
         }
     }
-    
-    
+
     /**
      * Returns a collection of core patterns covered by this inflection pattern.
      *
@@ -619,7 +606,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public Collection getCorePatterns() {
         return corePatterns;
     }
-    
+
     /**
      * Sets a new collection of core patterns covered by this inflection pattern.
      *
@@ -628,7 +615,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public void setCorePatterns(final Collection newCorePatterns) {
         corePatterns = newCorePatterns;
     }
-    
+
     /**
      * Returns a number of lexemes covered by this inflection pattern.
      *
@@ -637,7 +624,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public int getNumberOfCoveredLexemes() {
         return numberOfCoveredLexemes;
     }
-    
+
     /**
      * Sets a new value for the a number of lexemes covered by this inflection pattern.
      *
@@ -646,10 +633,10 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public void setNumberOfCoveredLexemes(final int newNumberOfCoveredLexemes) {
         numberOfCoveredLexemes = newNumberOfCoveredLexemes;
     }
-    
+
     /**
-     * Returns the string representation of this inflection pattern.
-     * This method returns a string containing succeeding supplements.
+     * Returns the string representation of this inflection pattern. This method returns a string
+     * containing succeeding supplements.
      *
      * @return The string representation of the inflection pattern.
      */
@@ -665,7 +652,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         }
         return res.toString();
     }
-    
+
     /**
      * Returns the integer identifier of this inflection pattern.
      *
@@ -674,7 +661,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public int getId() {
         return id;
     }
-    
+
     /**
      * Sets the new value for the integer identifier of this inflection pattern.
      *
@@ -683,7 +670,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public void setId(final int newId) {
         id = newId;
     }
-    
+
     /**
      * Returns the length of a longest core pattern.
      *
@@ -703,7 +690,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         }
         return res;
     }
-    
+
     /**
      * Returns the length of a longest supplement.
      *
@@ -726,8 +713,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         }
         return res;
     }
-    
-    
+
 //    /**
 //     *  Saves the inflection pattern to the output stream in the binary form.
 //     *
@@ -796,13 +782,12 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
 //        setNumberOfCoveredLexemes(in.readInt());
 //
 //    }
-
     /**
      * Reads this object data from the given input stream.
      *
-     * @param in   The input stream where this IPB is stored.
+     * @param in The input stream where this IPB is stored.
      *
-     * @throws IOException if any read error occurred.
+     * @throws IOException            if any read error occurred.
      * @throws ClassNotFoundException if this object cannot be instantied.
      */
     private void readObject(final ObjectInputStream in) throws IOException, ClassNotFoundException {
@@ -813,7 +798,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
      *
      * @param out
      * @param cache Packed structure of the inflection patterns.
-     * 
+     *
      * @throws java.io.IOException
      */
     public void write(InflectionPatternWriterCache cache) throws IOException {
@@ -836,7 +821,8 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     public void write(final DataOutputStream out) throws IOException {
         DataOutputStreamPacker.writeInt(id, out);
         DataOutputStreamPacker.writeInt(numberOfCoveredLexemes, out);
-        DataOutputStreamPacker.writeInt(otherFormPatterns == null ? -1 : otherFormPatterns.size(), out);
+        DataOutputStreamPacker.writeInt(otherFormPatterns == null ? -1 : otherFormPatterns.size(),
+                                        out);
         DataOutputStreamPacker.writeInt(coveredCores == null ? -1 : coveredCores.size(), out);
         if (coveredCores != null) {
             for (final Iterator it = coveredCores.iterator(); it.hasNext();) {
@@ -853,13 +839,16 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         }
     }
 
-    public static InflectionPatternImpl readInstance(final DataInputStream in, InflectionPatternWriterCache cache) throws IOException {
+    public static InflectionPatternImpl readInstance(final DataInputStream in,
+                                                     InflectionPatternWriterCache cache) throws
+            IOException {
         InflectionPatternImpl result = new InflectionPatternImpl();
         result.read(in, cache);
         return result;
     }
 
-    public void read(final DataInputStream in, InflectionPatternWriterCache cache) throws IOException {
+    public void read(final DataInputStream in, InflectionPatternWriterCache cache) throws
+            IOException {
         id = DataOutputStreamPacker.readInt(in);
         numberOfCoveredLexemes = DataOutputStreamPacker.readInt(in);
 
@@ -882,7 +871,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         } else {
             coveredCores = new ArrayList(count);
             for (int i = 0; i < count; i++) {
-                String  core = DataOutputStreamPacker.readString(in);
+                String core = DataOutputStreamPacker.readString(in);
                 coveredCores.add(core);
             }
         }
@@ -902,6 +891,3 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     }
 
 }
-
-
-

@@ -22,9 +22,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.log4j.Logger;
+import java.util.logging.Logger;
 import org.neurpheus.collections.tree.Tree;
-import org.neurpheus.collections.tree.TreeLeaf;
+import org.neurpheus.collections.tree.TreeNodeWithData;
 import org.neurpheus.collections.tree.TreeNode;
 import org.neurpheus.collections.tree.linkedlist.LinkedListTree;
 import org.neurpheus.collections.tree.linkedlist.LinkedListTreeFactory;
@@ -46,7 +46,7 @@ public class CompactBaseFormsDictionary implements BaseFormsDictionary, Serializ
     static final long serialVersionUID = 770608060908140005L;
     
     /** Holds logger for this class. */
-    private static Logger logger = Logger.getLogger(CompactBaseFormsDictionary.class);
+    private static Logger logger = Logger.getLogger(CompactBaseFormsDictionary.class.getName());
     
     /** Represents the dictionary data. */
     private LinkedListTree lltree;
@@ -71,7 +71,7 @@ public class CompactBaseFormsDictionary implements BaseFormsDictionary, Serializ
             ExtendedInflectionPattern[] ipa = baseDict.getInflectionPatterns(baseForm);
             addBaseForm(baseForm, ipa, objTree);
         }
-        lltree = (LinkedListTree) LinkedListTreeFactory.getInstance().createTree(objTree, true, true);
+        lltree = (LinkedListTree) LinkedListTreeFactory.getInstance().createTree(objTree, true, true, false);
     }
     
     /**
@@ -91,18 +91,18 @@ public class CompactBaseFormsDictionary implements BaseFormsDictionary, Serializ
         for (int i = 0; i < array.length; i++) {
             parentNode = node;
             char c = array[i];
-            node = parentNode.getChild(new Character(c));
+            node = parentNode.getChild(new Integer(c));
             if (node == null) {
-                node = tree.getFactory().createTreeNode(new Character(c));
+                node = tree.getFactory().createTreeNode(new Integer(c));
                 parentNode.addChild(node);
             }
         }
-        if (node.isLeaf()) {
+        if (node.hasExtraData()) {
             throw new IllegalStateException("Tree node should not be a leaf here.");
         } else {
-            TreeLeaf leaf = tree.getFactory().createTreeLeaf(node.getValue(), data);
-            leaf.setChildren(node.getChildren());
-            parentNode.replaceChild(node, leaf);
+            TreeNodeWithData nodeWithData = tree.getFactory().createTreeNodeWithAdditionalData(node.getValue(), data);
+            nodeWithData.setChildren(node.getChildren());
+            parentNode.replaceChild(node, nodeWithData);
         }
     }
     
@@ -144,7 +144,7 @@ public class CompactBaseFormsDictionary implements BaseFormsDictionary, Serializ
         ArrayList ipa = new ArrayList();
         for (Iterator it = lltree.getRoot().getChildren().iterator(); it.hasNext();) {
             TreeNode child = (TreeNode) it.next();
-            getBaseForms(child, new StringBuffer(), bfa, ipa);
+            getBaseForms(child, new StringBuilder(), bfa, ipa);
         }
         Map res = new HashMap();
         for (int i = bfa.size() - 1; i >= 0; i--) {
@@ -163,7 +163,7 @@ public class CompactBaseFormsDictionary implements BaseFormsDictionary, Serializ
         ArrayList res = new ArrayList();
         for (Iterator it = lltree.getRoot().getChildren().iterator(); it.hasNext();) {
             TreeNode child = (TreeNode) it.next();
-            getBaseForms(child, new StringBuffer(), res, null);
+            getBaseForms(child, new StringBuilder(), res, null);
         }
         return res;
     }
@@ -175,12 +175,12 @@ public class CompactBaseFormsDictionary implements BaseFormsDictionary, Serializ
      * @param form The string constructed from the parent nodes.
      * @param res The list of all forms.
      */
-    private void getBaseForms(final TreeNode node, final StringBuffer form, final ArrayList res, final ArrayList ipRes) {
+    private void getBaseForms(final TreeNode node, final StringBuilder form, final ArrayList res, final ArrayList ipRes) {
         form.append((char) (Integer.parseInt(node.getValue().toString())));
-        if (node.isLeaf()) {
+        if (node.hasExtraData()) {
             res.add(form.toString());
             if (ipRes != null) {
-                int ipaIndex = ((Integer) ((TreeLeaf) node).getData()).intValue();
+                int ipaIndex = ((Integer) ((TreeNodeWithData) node).getData()).intValue();
                 ExtendedInflectionPattern[] ipa = (ExtendedInflectionPattern[]) ipmap.get(ipaIndex);
                 ipRes.add(ipa);
             }
@@ -209,8 +209,8 @@ public class CompactBaseFormsDictionary implements BaseFormsDictionary, Serializ
                 return null;
             }
         }
-        if (node.isLeaf()) {
-            int ipaIndex = ((Integer) ((TreeLeaf) node).getData()).intValue();
+        if (node.hasExtraData()) {
+            int ipaIndex = ((Integer) ((TreeNodeWithData) node).getData()).intValue();
             ExtendedInflectionPattern[] ipa = (ExtendedInflectionPattern[]) ipmap.get(ipaIndex);
             return ipa;
         } else {

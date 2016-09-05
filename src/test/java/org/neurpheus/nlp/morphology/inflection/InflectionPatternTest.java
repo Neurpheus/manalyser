@@ -16,21 +16,6 @@
 package org.neurpheus.nlp.morphology.inflection;
 
 import junit.framework.*;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-import org.apache.log4j.Logger;
-import org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuildHelper;
-import org.neurpheus.nlp.morphology.VowelCharactersImpl;
-import org.neurpheus.core.string.MutableString;
 
 /**
  *
@@ -50,7 +35,7 @@ public class InflectionPatternTest extends TestCase {
 
     public void testInit() {
         String line = "ktokolwiek kogokolwiek kimkolwiek komukolwiek";
-        String[] forms = line.split("\\w");
+        String[] forms = line.split("\\s");
         InflectionPatternImpl ip = new InflectionPatternImpl(forms, false, true);
         assertEquals(1, ip.getCoveredCores().size());
         assertEquals("*kolwiek", ip.getCoveredCores().iterator().next().toString());
