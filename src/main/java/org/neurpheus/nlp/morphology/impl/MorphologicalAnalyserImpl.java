@@ -151,14 +151,14 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
 
     /** Creates a new instance of MorphologicalAnalyserImpl */
     public MorphologicalAnalyserImpl() {
+        charset = new DynamicCharset("international", new String[0]);
+        charset.setInternational();
         useBaseFormsDictionary = true;
         setUseNeuralNetwork(true);
         setSupportedLocales(new ArrayList(instances.keySet()));
         processingObjects = new ArrayList();
         frequentFormsCache = new HashMap();
         cache = new LRUCache(CACHE_SIZE);
-        charset = new DynamicCharset("international", new String[0]);
-        charset.setInternational();
     }
 
     public final static char BASE_FORM_TAG = '!';
@@ -952,6 +952,8 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         out.writeByte(tmp.length);
         out.write(tmp);
         out.writeInt(DATA_FORMAT_VERSION);
+        
+        // charset.write(out);
 
         out.writeInt(maxIndexOfNeuralInflectionPattern);
         out.writeDouble(supplementWeight);
@@ -1120,6 +1122,8 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
      */
     private void readObject(final ObjectInputStream in) throws IOException, ClassNotFoundException {
         DataInputStream din = new DataInputStream(in);
+        charset = new DynamicCharset("international", new String[0]);
+        charset.setInternational();
         read(din);
     }
 
@@ -1343,6 +1347,8 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
 
     /** Creates a new instance of MorphologicalAnalyserImpl */
     public MorphologicalAnalyserImpl(MorphologicalAnalyserInfo info) {
+        charset = new DynamicCharset("international", new String[0]);
+        charset.setInternational();
         cache = new LRUCache(CACHE_SIZE);
         useBaseFormsDictionary = true;
         setUseNeuralNetwork(true);
