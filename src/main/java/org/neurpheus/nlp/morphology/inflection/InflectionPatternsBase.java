@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.neurpheus.core.io.DataOutputStreamPacker;
+import org.neurpheus.core.string.LocaleHelper;
 import org.neurpheus.nlp.morphology.BaseFormsDictionary;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
 import org.neurpheus.nlp.morphology.VowelCharactersImpl;
@@ -773,7 +774,7 @@ public class InflectionPatternsBase implements Serializable {
             logger.fine("Reading inflection pattern base...");
         }
         long duration = java.lang.System.nanoTime();
-        language = new Locale(DataOutputStreamPacker.readString(in));
+        language = LocaleHelper.toLocale(DataOutputStreamPacker.readString(in));
         acceptPrefixes = in.readBoolean();
         acceptInfixes = in.readBoolean();
         tagset = null;

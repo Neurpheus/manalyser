@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.neurpheus.core.io.DataOutputStreamPacker;
+import org.neurpheus.core.string.LocaleHelper;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
 
 /**
@@ -261,7 +262,7 @@ public class InflectionPatternsMap implements Serializable {
     }
 
     public void read(final DataInputStream in) throws IOException {
-        language = new Locale(DataOutputStreamPacker.readString(in));
+        language = LocaleHelper.toLocale(DataOutputStreamPacker.readString(in));
         InflectionPatternsBase ipb = InflectionPatternFactory.getInflectionPatternsBase(language);
         if (ipb == null) {
             throw new IOException(
