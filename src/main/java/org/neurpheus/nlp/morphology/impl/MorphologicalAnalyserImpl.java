@@ -176,6 +176,9 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
     public final static Integer WILDCARD_INTEGER = new Integer((int) WILDCARD);
     public final static Integer VOWEL_INTEGER = new Integer((int) VOWEL);
     public final static Integer CONSONANT_INTEGER = new Integer((int) CONSONANT);
+    
+    public final static int[] MATCH_SUFFIX_KEYS = {WILDCARD_INTEGER, CORE_TAG_INTEGER, 0};
+    public final static int[] MATCH_CORE_KEYS = {CONSONANT_INTEGER, VOWEL_INTEGER, WILDCARD_INTEGER, CORE_TAG_INTEGER, 0};
 
     private static final int STATE_MATCH_SUFFIX = 20;
     private static final int STATE_MATCH_BASE_FORM = 30;
@@ -401,7 +404,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         boolean perfectMatching = false;
 
         LinkedListTreeNode tmpNode;
-        LinkedListTreeNode previousNode = null;
+        LinkedListTreeNode[] foundChildren = new LinkedListTreeNode[5];
         ProcessingState ps;
 
         boolean finish = false;
@@ -421,19 +424,17 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                 traceInfo.append(state.prefixPos);
                 traceInfo.append("|cpos=");
                 traceInfo.append(state.corePos);
-                if (previousNode != null) {
-                    traceInfo.append("|pn=");
-                    traceInfo.append((previousNode.getValue() == null ? "null" : previousNode.
-                            getValue().toString()));
-                }
                 logger.log(Level.FINEST, traceInfo.toString());
             }
             switch (state.stateType) {
                 case STATE_MATCH_SUFFIX:
 
+                    MATCH_SUFFIX_KEYS[2] = state.cint;
+                    state.node.findChildren(MATCH_SUFFIX_KEYS, foundChildren, intStack, 0);
+
                     // check wildcard
-                    tmpNode = (LinkedListTreeNode) state.node.
-                            getChild(WILDCARD_INTEGER, intStack, 0);
+                    //tmpNode = (LinkedListTreeNode) state.node.getChild(WILDCARD_INTEGER, intStack, 0);
+                    tmpNode = foundChildren[0];
                     if (tmpNode != null) {
                         ps = stack[stackPos++];
                         ps.suffixPos = state.chPos + 1;
@@ -445,14 +446,10 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         ps.cint = new Integer((int) ps.c);
                     }
 
-                    previousNode = tmpNode;
 
                     // check core tag
-//                    tmpNode = (LinkedListTreeNode) (
-//                            previousNode == null ? state.node.getChild(CORE_TAG_INTEGER, intStack, 0) 
-//                            : state.node.getChild(CORE_TAG_INTEGER, previousNode));
-
-                    tmpNode = (LinkedListTreeNode) state.node.getChild(CORE_TAG_INTEGER, intStack, 0);
+                    //tmpNode = (LinkedListTreeNode) state.node.getChild(CORE_TAG_INTEGER, intStack, 0);
+                    tmpNode = foundChildren[1];
 
                     
                     if (tmpNode != null) {
@@ -465,21 +462,11 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         ps.cint = state.cint;
                     }
 
-                    if (tmpNode != null) {
-                        previousNode = tmpNode;
-                    }
-
                     // check succeding character
-//                    tmpNode = (LinkedListTreeNode) (previousNode == null ? state.node.getChild(
-//                            state.cint, intStack, 0) : state.node.getChild(state.cint, previousNode));
-                    
-                    tmpNode = (LinkedListTreeNode) state.node.getChild(state.cint, intStack, 0);
+                    //tmpNode = (LinkedListTreeNode) state.node.getChild(state.cint, intStack, 0);
+                    tmpNode = foundChildren[2];
                     
                     if (tmpNode == null && startsFromUppercase && state.chPos == 0) {
-//                        tmpNode = (LinkedListTreeNode) (previousNode == null ? state.node.getChild(
-//                                firtCharCode, intStack, 0) : state.node.getChild(firtCharCode,
-//                                                                                 previousNode));
-                        
                         tmpNode = (LinkedListTreeNode) state.node.getChild(firtCharCode, intStack, 0);
                         
                     }
@@ -544,15 +531,17 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
 
                 case STATE_MATCH_CORE:
 
+                    MATCH_CORE_KEYS[4] = state.cint;
+                    state.node.findChildren(MATCH_CORE_KEYS, foundChildren, intStack, 0);
                     
                     if (state.chPos >=0) {
                         // match vowel or consonant
                         if (vch.isVowel(state.c)) {
-                            tmpNode = (LinkedListTreeNode) state.node.getChild(VOWEL_INTEGER, intStack,
-                                                                               0);
+                            //tmpNode = (LinkedListTreeNode) state.node.getChild(VOWEL_INTEGER, intStack,0);
+                            tmpNode = foundChildren[1];
                         } else {
-                            tmpNode = (LinkedListTreeNode) state.node.getChild(CONSONANT_INTEGER,
-                                                                               intStack, 0);
+                            //tmpNode = (LinkedListTreeNode) state.node.getChild(CONSONANT_INTEGER, intStack, 0);
+                            tmpNode = foundChildren[0];
                         }
                         if (tmpNode != null) {
                             ps = stack[stackPos++];
@@ -572,15 +561,9 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         tmpNode = null;
                     }
 
-                    previousNode = tmpNode;
-
                     // check wildcard
-//                    tmpNode = (LinkedListTreeNode) (previousNode == null ? state.node.getChild(
-//                            WILDCARD_INTEGER, intStack, 0) : state.node.getChild(WILDCARD_INTEGER,
-//                                                                                 previousNode));
-
-                    
-                    tmpNode = (LinkedListTreeNode) state.node.getChild(WILDCARD_INTEGER, intStack, 0);
+                    //tmpNode = (LinkedListTreeNode) state.node.getChild(WILDCARD_INTEGER, intStack, 0);
+                    tmpNode = foundChildren[2];
                     
                     if (tmpNode != null) {
                         ps = stack[stackPos++];
@@ -593,16 +576,9 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         ps.corePos = state.chPos + 1;
                     }
 
-                    if (tmpNode != null) {
-                        previousNode = tmpNode;
-                    }
-
                     // check core tag
-//                    tmpNode = (LinkedListTreeNode) (previousNode == null ? state.node.getChild(
-//                            CORE_TAG_INTEGER, intStack, 0) : state.node.getChild(CORE_TAG_INTEGER,
-//                                                                                 previousNode));
-                    
-                    tmpNode = (LinkedListTreeNode) state.node.getChild(CORE_TAG_INTEGER, intStack, 0);
+                    //tmpNode = (LinkedListTreeNode) state.node.getChild(CORE_TAG_INTEGER, intStack, 0);
+                    tmpNode = foundChildren[3];
                     
                     
                     if (tmpNode != null) {
@@ -616,20 +592,12 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         ps.corePos = state.chPos + 1;
                     }
 
-                    if (tmpNode != null) {
-                        previousNode = tmpNode;
-                    }
-
                     // match character
-//                    tmpNode = (LinkedListTreeNode) (previousNode == null ? state.node.getChild(
-//                            state.cint, intStack, 0) : state.node.getChild(state.cint, previousNode));
-                    tmpNode = (LinkedListTreeNode) state.node.getChild(state.cint, intStack, 0);
+                    //tmpNode = (LinkedListTreeNode) state.node.getChild(state.cint, intStack, 0);
+                    tmpNode = foundChildren[4];
                     
                     
                     if (tmpNode == null && startsFromUppercase && state.chPos == 0) {
-//                        tmpNode = (LinkedListTreeNode) (previousNode == null ? state.node.getChild(
-//                                firtCharCode, intStack, 0) : state.node.getChild(firtCharCode,
-//                                                                                 previousNode));
                         tmpNode = (LinkedListTreeNode) state.node.getChild(firtCharCode, intStack, 0);
                     }
                     if (tmpNode != null) {
