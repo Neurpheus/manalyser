@@ -34,9 +34,11 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 import org.neurpheus.core.io.DataOutputStreamPacker;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
+import org.neurpheus.nlp.morphology.VowelCharacters;
 import org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuildHelper;
 import org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl;
 import org.neurpheus.nlp.morphology.VowelCharactersImpl;
+import static org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl.WILDCARD_CHARACTER;
 
 /**
  * Represents an inflection pattern (IP).
@@ -364,22 +366,26 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
     }
 
     /**
-     * Determines core patterns analysing words covered by this inflection pattern.
+     * Determines core patterns analyzing words covered by this inflection pattern.
      *
      * Patterns Determination Algorithm:
-     *
-     * 1. Create an empty set R which will contain result patterns. 2. Get list of cores wich will
-     * be analysed. 3. If number of analysed words is too small, finish with empty result. 4. Get as
-     * a current pattern, the pattern which covers all words (empty pattern) 5. Find the best subset
-     * of patterns which can replace current pattern and add all patterns from the subset to the
-     * result set. Subset containng only one empty pattern is not allowed. 6. Remove useless lemma
-     * paterns. 7. Return the result.
+     * <ul>
+     * <li>1. Create an empty set R which will contain result patterns.</li> 
+     * <li>2. Get list of cores which will be analyzed. </li> 
+     * <li>3. If number of analyzed words is too small, finish with empty result. </li> 
+     * <li>4. Get as a current pattern, the pattern which covers all words (empty pattern) </li> 
+     * <li>5. Find the best subset of patterns which can replace current pattern and add all patterns from the subset to the
+     * result set. Subset containing only one empty pattern is not allowed. </li> 
+     * <li>6. Remove useless lemma patterns. </li> 
+     * <li>7. Return the result.</li> 
+     * </ul>
      *
      * @param vowels Represents the vowels of a natural language.
      *
      * @return A set of strings.
      */
-    public Set determineCorePatterns(final VowelCharactersImpl vowels) {
+    @Override
+    public Set determineCorePatterns(final VowelCharacters vowels) {
 
         // 1.  Create an empty set R which will contain result patterns.
         Set result = new HashSet();
@@ -541,7 +547,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
         //           cores covered by single pattern from the subset is lower then 4.
         //      3.d. Subset is empty.
         boolean subsetRight = true;
-        if (!(pattern.equals("") || pattern.equals("*"))) {
+        if (!(pattern.equals("") || pattern.equals(WILDCARD_CHARACTER))) {
             if (subset.size() == 0
                     || weightSum < cp.getWeight()
                     || subset.size() > MAXIMUM_SIZE_OF_CORE_PATTERNS_SUBSET
@@ -582,7 +588,7 @@ public class InflectionPatternImpl implements Comparable, ExtendedInflectionPatt
      *
      * @param vowels Represents the vowels in a natural language.
      */
-    private void removeUseless(final VowelCharactersImpl vowels) {
+    private void removeUseless(final VowelCharacters vowels) {
         // Removing lemma patterns which covers less then two lemmas.
         for (Iterator it = corePatterns.iterator(); it.hasNext();) {
             CorePattern lemmaPattern = (CorePattern) it.next();

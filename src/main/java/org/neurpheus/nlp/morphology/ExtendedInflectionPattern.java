@@ -128,7 +128,7 @@ public interface ExtendedInflectionPattern {
      * @param  vowels  Represents the vowels of a natural language.
      * @return The set of strings representing determined core patterns.
      */
-    Set determineCorePatterns(VowelCharactersImpl vowels);
+    Set determineCorePatterns(VowelCharacters vowels);
     
     
     /**

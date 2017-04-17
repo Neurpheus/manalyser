@@ -27,6 +27,9 @@ import org.neurpheus.collections.tree.objecttree.ObjectTreeFactory;
 import org.neurpheus.core.string.StringHelper;
 import org.neurpheus.nlp.morphology.BaseFormsDictionary;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
+import static org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl.BASE_FORM_TAG;
+import static org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl.CORE_TAG;
+import static org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl.WILDCARD_CHARACTER;
 import org.neurpheus.nlp.morphology.inflection.CorePattern;
 import org.neurpheus.nlp.morphology.inflection.FormPattern;
 import org.neurpheus.nlp.morphology.inflection.InflectionPatternsMap;
@@ -39,8 +42,6 @@ import org.neurpheus.nlp.morphology.inflection.InflectionPatternsMap;
  */
 public class InflectionTreeBuilder {
 
-    public final static char BASE_FORM_TAG = '!';
-    public final static char CORE_TAG = '/';
     
     /** If <code>true</code> (default value), the builder adds base forms to the inflection tree */
     private final static boolean addBaseFormsToTree = true;
@@ -127,7 +128,7 @@ public class InflectionTreeBuilder {
     }
     
     public static void addSupplement(String supplement, ExtendedInflectionPattern ip, Tree tree, boolean isBase) {
-        final char WILDCARD = MorphologicalAnalyserBuildHelper.WILDCARD_CHARACTER;
+        final char WILDCARD = WILDCARD_CHARACTER;
         boolean added = false;
         if (addCorePatternsToTree && ip.getCorePatterns().size() > 0) {
             for (Iterator it = ip.getCorePatterns().iterator(); it.hasNext(); ) {

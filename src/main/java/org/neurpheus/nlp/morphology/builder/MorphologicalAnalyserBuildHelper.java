@@ -17,6 +17,7 @@ package org.neurpheus.nlp.morphology.builder;
 
 import java.util.HashSet;
 import java.util.logging.Logger;
+import static org.neurpheus.nlp.morphology.impl.MorphologicalAnalyserImpl.WILDCARD_CHARACTER;
 
 
 /**
@@ -28,7 +29,6 @@ public class MorphologicalAnalyserBuildHelper {
     private Logger logger = Logger.getLogger(MorphologicalAnalyserBuildHelper.class.getName());
     
     public static char NULLCHAR_CHARACTER = '~';
-    public static char WILDCARD_CHARACTER = '*';
     
     public static String getLongestSubString(String[] forms, boolean acceptInfixes, boolean acceptPrefixes) {
         if (forms.length == 0) {
@@ -87,10 +87,10 @@ public class MorphologicalAnalyserBuildHelper {
             }
         }
         if (suffix) {
-            longest += '*';
+            longest += WILDCARD_CHARACTER;
         }
         if (prefix) {
-            longest = '*' + longest;
+            longest = WILDCARD_CHARACTER + longest;
         }
         return longest;
         /* 
@@ -170,7 +170,7 @@ public class MorphologicalAnalyserBuildHelper {
                         if (!acceptInfixes) {
                             boolean hasInfix = false;
                             for (int j = 0; j < buffer.length(); j++) {
-                                hasInfix |= buffer.charAt(j) == '*' && j > 1 && j < buffer.length() - 1;
+                                hasInfix |= buffer.charAt(j) == WILDCARD_CHARACTER && j > 1 && j < buffer.length() - 1;
                             }
                             if (hasInfix) {
                                 buffer = null;
@@ -192,7 +192,7 @@ public class MorphologicalAnalyserBuildHelper {
             String core=(String)(it.next());
             int mark = 0;
             for (int j = core.length() - 1; j >= 0; j--) {
-                if (core.charAt(j) == '*') {
+                if (core.charAt(j) == WILDCARD_CHARACTER) {
                     mark--;
                     j--;
                 } else {
@@ -229,8 +229,8 @@ public class MorphologicalAnalyserBuildHelper {
             return form;
         }
         int coreLen = core.length();
-        boolean allowPrefix = core.charAt(0) == '*';
-        boolean allowSuffix = core.charAt(coreLen - 1) == '*';
+        boolean allowPrefix = core.charAt(0) == WILDCARD_CHARACTER;
+        boolean allowSuffix = core.charAt(coreLen - 1) == WILDCARD_CHARACTER;
         String pureCore = core.substring(allowPrefix ? 1 : 0, allowSuffix ? coreLen - 1 : coreLen);
         int pos = form.lastIndexOf(pureCore);
         if (pos >= 0) {
@@ -238,7 +238,7 @@ public class MorphologicalAnalyserBuildHelper {
             if (pos > 0) {
                 buffer.append(form.substring(0, pos));
             }
-            buffer.append('*');
+            buffer.append(WILDCARD_CHARACTER);
             buffer.append(form.substring(pos + pureCore.length()));
             return buffer.toString();
         } else {

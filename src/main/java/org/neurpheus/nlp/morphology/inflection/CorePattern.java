@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.Iterator;
 import org.neurpheus.core.io.DataOutputStreamPacker;
+import org.neurpheus.nlp.morphology.VowelCharacters;
 import org.neurpheus.nlp.morphology.VowelCharactersImpl;
 
 /**
@@ -163,7 +164,7 @@ public class CorePattern implements Serializable {
      *
      * @return <code>true</code> if this core pattern covers the given core.
      */
-    public boolean matches(final String core, final VowelCharactersImpl vowels) {
+    public boolean matches(final String core, final VowelCharacters vowels) {
         if (pattern == null) {
             return core == null;
         }
@@ -176,11 +177,11 @@ public class CorePattern implements Serializable {
         for (int pix = pa.length - 1; pix >= 0; pix--, cix--) {
             if (ca[cix] != pa[pix]) {
                 char c = pa[pix];
-                if (c == vowels.getVowelSign()) {
+                if (c == vowels.getVowelSign() && Character.isLetter(ca[cix])) {
                     if (!vowels.isVowel(ca[cix])) {
                         return false;
                     }
-                } else if (c == vowels.getConsonantSign()) {
+                } else if (c == vowels.getConsonantSign() && Character.isLetter(ca[cix])) {
                     if (vowels.isVowel(ca[cix])) {
                         return false;
                     }
@@ -199,18 +200,18 @@ public class CorePattern implements Serializable {
      * @param cores The collection of cores which should be filtered.
      * @param vowels The object representing vowels of a language of cores.
      */
-    public void removeCoveredCores(final Collection cores, final VowelCharactersImpl vowels) {
+    public void removeCoveredCores(final Collection cores, final VowelCharacters vowels) {
         boolean containsVowel = false;
         boolean containsConsonant = false;
         int minCoreLength = Integer.MAX_VALUE;
         for (Iterator it = cores.iterator(); it.hasNext();) {
             String core = (String) it.next();
-            if (core.equals("*inn*") && pattern.equals("inn*")) {
+            if (core.equals("%inn%") && pattern.equals("inn%")) {
                 core = core + "";
             }
             if (matches(core, vowels)) {
                 int clen = core.length();
-                if (core.startsWith("*")) {
+                if (core.startsWith("%")) {
                     clen--;
                 }
                 if (clen < minCoreLength) {

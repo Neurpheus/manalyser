@@ -41,6 +41,7 @@ import org.neurpheus.core.io.DataOutputStreamPacker;
 import org.neurpheus.core.string.LocaleHelper;
 import org.neurpheus.nlp.morphology.BaseFormsDictionary;
 import org.neurpheus.nlp.morphology.ExtendedInflectionPattern;
+import org.neurpheus.nlp.morphology.VowelCharacters;
 import org.neurpheus.nlp.morphology.VowelCharactersImpl;
 import org.neurpheus.nlp.morphology.baseimpl.TagsetImpl;
 import org.neurpheus.nlp.morphology.tagset.Tagset;
@@ -175,10 +176,12 @@ public class InflectionPatternsBase implements Serializable {
      */
     public ExtendedInflectionPattern addInflectionPattern(final String line) {
         // Parse the line parameter and extract an array of forms.
-        String[] tab = line.split("\\s");
+        String[] tab = line.split(",");
         int pos = 0;
         for (int i = 0; i < tab.length; i++) {
-            if (tab[i].length() > 0) {
+            String str = tab[i].trim();
+            tab[i] = str;
+            if (str.length() > 0) {
                 tab[pos++] = tab[i];
             }
         }
@@ -386,8 +389,8 @@ public class InflectionPatternsBase implements Serializable {
                     logger.fine("Processing line : " + line);
                 }
                 ExtendedInflectionPattern ip = ipb.addInflectionPattern(line);
-                int pos = line.indexOf(' ');
-                dict.addBaseForm(pos < 0 ? line : line.substring(0, pos), ip);
+                int pos = line.indexOf(',');
+                dict.addBaseForm(pos < 0 ? line : line.substring(0, pos).trim(), ip);
                 number++;
                 if (logger.isLoggable(Level.FINE) && (number % numberOfLinesBetweenInfoMessages == 0)) {
                     logger.fine("Number of processed words : " + number);
@@ -541,7 +544,7 @@ public class InflectionPatternsBase implements Serializable {
      *
      * @param vowels Represents the vowel characters of a analysed language.
      */
-    public void determineCorePatterns(final VowelCharactersImpl vowels) {
+    public void determineCorePatterns(final VowelCharacters vowels) {
         final int numberOfIPsBetweenInfoMessage = 100;
         int number = 0;
         for (Iterator it = getInflectionPatterns().iterator(); it.hasNext(); number++) {

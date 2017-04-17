@@ -57,8 +57,6 @@ import org.neurpheus.nlp.morphology.inflection.InflectionPatternsBase;
 import org.neurpheus.nlp.morphology.inflection.XMLInflectionPatternBaseHelper;
 import org.neurpheus.nlp.morphology.tagset.GrammaticalPropertiesList;
 import org.neurpheus.nlp.morphology.tagset.Tagset;
-import org.neurpheus.nlp.myspell.FullDictionaryWriter;
-import org.neurpheus.nlp.myspell.MySpellDictionary;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -72,13 +70,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -89,6 +85,35 @@ import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.neurpheus.core.charset.DynamicCharset;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuildStep.*;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_ANALYSER;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_BASE_FORMS_DICTIONARY;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_ERROR_STATISTIC;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_FREQUENT_WORDS;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_FULL_DICTIONARY;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_INFLECTION_TREE;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_INFLECTION_TREE_LOG;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_IPB;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_IPB_INTEGRATED;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_IPB_IN_XML;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_IPB_LOG;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_IPB_OUT_XML;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_IPB_WITH_PATTERNS;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_IPB_WITH_PATTERN_LOG;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_MORPHEMES_STATISTIC;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_TAGGING_FILE;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_TAGGING_INFO;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_TAGSET;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.EXTENSION_TRAINING_SET;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.INFO_AUTHORS;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.INFO_COPYRIGHT;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.INFO_DESCRIPTION;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.INFO_LICENCE;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.INFO_NAME;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.INFO_VENDOR;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.INFO_WEB_PAGE;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.MIN_LEXEMES_COUNT_FOR_NEURAL_IP;
+import static org.neurpheus.nlp.morphology.builder.MorphologicalAnalyserBuilderParameters.NUMBER_OF_HASH_FUNCTIONS_FOR_BLOOM_FILTER;
 
 /**
  * Generates a morphological analyser from a MySpell dictionary.
@@ -110,141 +135,25 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
         neuralNetworkLearningProperties = aNeuralNetworkLearningProperties;
     }
 
+
     /**
      * Private constructor prevents instance creation.
      */
     private MorphologicalAnalyserBuilder() {
     }
 
-    /**
-     * Holds the minimal numer of lexemes which should be covered by an inflection pattern processed
-     * by the neural network. Inflection patterns which covers less then this value are ignored by
-     * the neural network.
-     */
-    public static final int MIN_LEXEMES_COUNT_FOR_NEURAL_IP = 10;
-
-    /** In this step this class generates a full dictionary from a MySpell dictionary. */
-    public static final int STEP_GENERATE_FULL_DICTIONARY = 0;
-
-    /** In this step this class creates an inflection patterns base from a full dictionary. */
-    public static final int STEP_CREATE_INFLECTION_PATTERNS_BASE = 1;
-
-    /** In this step this class logs out a statistic about morpheme usage in an analysed language. */
-    public static final int STEP_MORPHEMES_STATISTICS = 2;
-
-    /** In this step this class logs out a statistic about morpheme usage in an analysed language. */
-    public static final int STEP_TAG_INFLECTION_PATTERNS = 3;
-
-    /** In this step this class determines a set of core patterns for wach inflection pattern. */
-    public static final int STEP_DETERMINE_CORE_PATTERNS = 4;
-
-    /** In this step this class creates an inflection tree for the inflection pattern base. */
-    public static final int STEP_CREATE_ANALYSER = 5;
-
-    /** In this step this class creates a training set for a neural network learning process. */
-    public static final int STEP_CREATE_TRAINING_SET = 6;
-
-    /**
-     * In this step this class learns a neural network which selects best inflection pattern for an
-     * analysed word.
-     */
-    public static final int STEP_LEARN_NEURAL_NETWORK = 7;
-
-    /** In this step this class test an analyser. */
-    public static final int STEP_CREATE_JAR_PACKAGE = 8;
-
-    /** In this step this class test an analyser. */
-    public static final int STEP_TEST_ANALYSER = 9;
-
-    /** The extension of a file where full dictionary is stored. */
-    public static final String EXTENSION_FULL_DICTIONARY = ".all";
-
-    public static final String EXTENSION_DICTIONARY = ".dic";
-
-    public static final String EXTENSION_FULL_DICTIONARY_ADD = "_toadd.txt";
-
-    public static final String EXTENSION_FULL_DICTIONARY_REMOVE = "_toremove.txt";
-
-    /** The extension of a file where inflection pattern base is stored. */
-    public static final String EXTENSION_IPB = ".ipb";
-
-    /** The extension of a file where inflection pattern base is stored. */
-    public static final String EXTENSION_IPB_INTEGRATED = ".small.ipb";
-
-    /** The extension of a file where tagset is. */
-    public static final String EXTENSION_TAGSET = ".tags";
-
-    /** The extension of a file which provided info about tagging file. */
-    public static final String EXTENSION_TAGGING_INFO = "_tagging.xml";
-
-    /** The extension of a file which provided example tagging of forms. */
-    public static final String EXTENSION_TAGGING_FILE = "_tagging.txt";
-
-    /** The extension of a file where inflection pattern base is stored as xml. */
-    public static final String EXTENSION_IPB_OUT_XML = ".ipb.out.xml";
-
-    /** The extension of a file from which system reads tags of inflections patterns. */
-    public static final String EXTENSION_IPB_IN_XML = ".ipb.in.xml";
-
-    /** The extension of a file where inflection pattern base is logged out. */
-    public static final String EXTENSION_IPB_LOG = ".ipb.log";
-
-    /** The extension of a file where base forms dictionary is stored. */
-    public static final String EXTENSION_BASE_FORMS_DICTIONARY = ".bfd";
-
-    /** The extension of a file where inflection pattern base with determined core patterns is
-     * stored. */
-    public static final String EXTENSION_IPB_WITH_PATTERNS = "_patterns.ipb";
-
-    /** The extension of a file where inflection pattern base with determined core patterns is
-     * logged out. */
-    public static final String EXTENSION_IPB_WITH_PATTERN_LOG = "_patterns.ipb.log";
-
-    /** The extension of a file where morpheme statistic is printed. */
-    public static final String EXTENSION_MORPHEMES_STATISTIC = "_morphemes.txt";
-
-    /** The extension of a file where top words of a language are defined. */
-    public static final String EXTENSION_FREQUENT_WORDS = "_top_words.txt";
-
-    /** The extension of a file where inflection tree is stored. */
-    public static final String EXTENSION_INFLECTION_TREE = ".ipt";
-
-    /** The extension of a file where inflection tree is logged out. */
-    public static final String EXTENSION_INFLECTION_TREE_LOG = ".ipt.log";
-
-    /** The extension of a file where trainign set is stored. */
-    public static final String EXTENSION_TRAINING_SET = ".trn";
-
-    /** The extension of a file where neural network is stored. */
-    public static final String EXTENSION_NEURAL_NETWORK = ".neu";
-
-    /** The extension of a file where an anlyser is sored. */
-    public static final String EXTENSION_ANALYSER = ".ana";
-
-    /** The extension of a file where an error statistic is sored. */
-    public static final String EXTENSION_ERROR_STATISTIC = "_err_statistic.csv";
 
     /** The step from which start processing. */
-    private static int fromStep = STEP_GENERATE_FULL_DICTIONARY;
+    private static MorphologicalAnalyserBuildStep fromStep = STEP_GENERATE_FULL_DICTIONARY;
 
-    /** The step on which end procesing. */
-    private static int toStep = STEP_TEST_ANALYSER;
+    /** The step on which end processing. */
+    private static MorphologicalAnalyserBuildStep toStep = STEP_TEST_ANALYSER;
 
-    /** Holds the number of hash functions used by a bloom filter. */
-    private static int NUMBER_OF_HASH_FUNCTIONS_FOR_BLOOM_FILTER = 2;
 
     /** Holds the maximum number of training examples processed while neural network learning
      * process. */
     private static NeuralNetworkLearningProperties neuralNetworkLearningProperties = new NeuralNetworkLearningProperties();
 
-    /** The path to the directory where MySpell and output files are stored. */
-    private static String dictionariesPath = "C:\\projekty\\neurpheus\\data\\dictionaries\\";
-
-    /** Symbols of dictionaries to process. */
-    private static String[] dictionaries = {"test_pl_PL"};
-
-    /** Processed languages. */
-    private static Locale[] languages = {new Locale("pl", "PL")};
 
 //    /** Symbols of dictionaries to process. */
 //    private static String[] dictionaries = {"en_GB"};
@@ -266,14 +175,8 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
     /** Denotes if prefixes are allowed for inflection patterns. */
     private static boolean acceptPrefixes = true;
 
-    public static String INFO_AUTHORS = "Jakub Strychowski";
-    public static String INFO_COPYRIGHT = "Copyright (C) 2008 Jakub Strychowski";
-    public static String INFO_DESCRIPTION = "Definition of the morfological analyser.";
-    public static String INFO_LICENCE = "LGPL (GNU Lesser General Public License";
-    public static String INFO_NAME = "Neurpheus Morphological Analyser";
-    public static String INFO_VENDOR = "Neurpheus";
-    public static String INFO_WEB_PAGE = "www.neurpheus.org";
-
+    private static String workingDirectory = MorphologicalAnalyserBuilderParameters.dictionariesPath;
+    
     /**
      * Returns a path to a file having given suffix.
      *
@@ -281,216 +184,12 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      *
      * @return The path to the file.
      */
-    private static String getPath(final String suffix) {
-        return dictionariesPath + symbol + suffix;
+    protected static String getPath(final String suffix) {
+        return workingDirectory + symbol + suffix;
     }
 
-    /**
-     * Generates a full dictionary file from a MySpell dictionary. Full dictionary file is a text
-     * file where each line of the file correspondes to a lexeme. Each lexeme is represendted by
-     * lexeme forms separated by spaces. First form is a base form.
-     *
-     *
-     * @throws MorpologicalAnalyserBuildException if any processing error occurred.
-     */
-    public static void generateFullDictionary() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_GENERATE_FULL_DICTIONARY
-                + " (FULL DICTIONARY GENERATION) started.");
-
-        MySpellDictionary dict = new MySpellDictionary();
-        try {
-            dict.load(dictionariesPath, symbol);
-        } catch (Exception e) {
-            throw new MorphologicalAnalyserBuildException("Cannot load a MySpell dictionary.", e);
-        }
-        String outPath = getPath(EXTENSION_FULL_DICTIONARY);
-        PrintStream out = null;
-        BufferedReader reader = null;
-        HashSet ignoredForms = new HashSet();
-        try {
-            logger.info("Generating the full dictionary to the file: " + outPath);
-            out = new PrintStream(new BufferedOutputStream(new FileOutputStream(outPath)), false,
-                                  "UTF-8");
-
-            // add forms from ..._toadd.txt file
-            String addPath = getPath(EXTENSION_FULL_DICTIONARY_ADD);
-            File addFile = new File(addPath);
-            if (addFile.exists() && addFile.canRead()) {
-                reader = new BufferedReader(new InputStreamReader(new FileInputStream(addFile),
-                                                                  "UTF-8"));
-                String line;
-                do {
-                    line = reader.readLine();
-                    if (line != null && line.trim().length() > 0 && !line.startsWith("//")) {
-                        out.println(line.trim());
-                    }
-                } while (line != null);
-                reader.close();
-                reader = null;
-            }
-
-            // read forms which should be omitted from file ..._toremove.txt
-            String removePath = getPath(EXTENSION_FULL_DICTIONARY_REMOVE);
-            File removeFile = new File(removePath);
-            if (removeFile.exists() && removeFile.canRead()) {
-                reader = new BufferedReader(new InputStreamReader(new FileInputStream(removeFile),
-                                                                  "UTF-8"));
-                String line;
-                do {
-                    line = reader.readLine();
-                    if (line != null && line.trim().length() > 0 && !line.startsWith("//")) {
-                        String[] forms = line.split("\\s");
-                        for (int i = 0; i < forms.length; i++) {
-                            String form = forms[i].trim();
-                            if (form.length() > 0) {
-                                ignoredForms.add(form);
-                            }
-                        }
-                    }
-                } while (line != null);
-                reader.close();
-                reader = null;
-            }
-            dict.processAllForms(new FullDictionaryWriter(out, ignoredForms), false);
-        } catch (Exception e) {
-            throw new MorphologicalAnalyserBuildException("Cannot generate the full dictionary.", e);
-        } finally {
-            if (out != null) {
-                out.close();
-            }
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException ex) {
-                    logger.log(Level.WARNING, "Cannot close stream", ex);
-                }
-            }
-        }
-        logger.info("STEP " + STEP_GENERATE_FULL_DICTIONARY
-                + " (FULL DICTIONARY GENERATION) finished.");
-    }
-
-    /**
-     * Generates a full dictionary file from a MySpell dictionary. Full dictionary file is a text
-     * file where each line of the file correspondes to a lexeme. Each lexeme is represendted by
-     * lexeme forms separated by spaces. First form is a base form.
-     *
-     *
-     * @throws MorpologicalAnalyserBuildException if any processing error occurred.
-     */
-    public static void regenerateFullDictionary() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_GENERATE_FULL_DICTIONARY
-                + " (FULL DICTIONARY GENERATION) started.");
-
-//        MySpellDictionary dict = new MySpellDictionary();
-//        try {
-//            dict.load(dictionariesPath, symbol);
-//        } catch (Exception e) {
-//            throw new MorphologicalAnalyserBuildException("Cannot load a MySpell dictionary.", e);
-//        }
-        String inPath = getPath(EXTENSION_DICTIONARY);
-        String outPath = getPath(EXTENSION_FULL_DICTIONARY);
-        PrintStream out = null;
-        BufferedReader reader = null;
-        HashSet ignoredForms = new HashSet();
-        try {
-            logger.info("Generating the full dictionary to the file: " + outPath);
-            out = new PrintStream(new BufferedOutputStream(new FileOutputStream(outPath)), false,
-                                  "UTF-8");
-
-            // add forms from ..._toadd.txt file
-            String addPath = getPath(EXTENSION_FULL_DICTIONARY_ADD);
-            File addFile = new File(addPath);
-            if (addFile.exists() && addFile.canRead()) {
-                reader = new BufferedReader(new InputStreamReader(new FileInputStream(addFile),
-                                                                  "UTF-8"));
-                String line;
-                do {
-                    line = reader.readLine();
-                    if (line != null && line.trim().length() > 0 && !line.startsWith("//")) {
-                        out.println(line.trim());
-                    }
-                } while (line != null);
-                reader.close();
-                reader = null;
-            }
-
-            // read forms which should be omitted from file ..._toremove.txt
-            String removePath = getPath(EXTENSION_FULL_DICTIONARY_REMOVE);
-            File removeFile = new File(removePath);
-            if (removeFile.exists() && removeFile.canRead()) {
-                reader = new BufferedReader(new InputStreamReader(new FileInputStream(removeFile),
-                                                                  "UTF-8"));
-                String line;
-                do {
-                    line = reader.readLine();
-                    if (line != null && line.trim().length() > 0 && !line.startsWith("//")) {
-                        String[] forms = line.split("\\s");
-                        for (int i = 0; i < forms.length; i++) {
-                            String form = forms[i].trim();
-                            if (form.length() > 0) {
-                                ignoredForms.add(form);
-                            }
-                        }
-                    }
-                } while (line != null);
-                reader.close();
-                reader = null;
-            }
-
-            // add forms from ..._toadd.txt file
-            File inFile = new File(inPath);
-            reader = new BufferedReader(new InputStreamReader(new FileInputStream(inFile), "UTF-8"));
-            String line;
-            do {
-                line = reader.readLine();
-                if (line != null && line.trim().length() > 0) {
-                    String[] tab;
-                    if (line.indexOf(',') >= 0) {
-                        tab = line.split(",");
-                    } else {
-                        tab = line.split("\\s");
-                    }
-                    if (tab.length > 0) {
-                        String baseForm = tab[0].trim();
-                        if (baseForm.indexOf(' ') < 0 && !ignoredForms.contains(baseForm)) {
-                            StringBuffer buffer = new StringBuffer();
-                            for (int i = 0; i < tab.length; i++) {
-                                String form = tab[i].trim();
-                                if (form.length() > 0) {
-                                    if (buffer.length() > 0) {
-                                        buffer.append(' ');
-                                    }
-                                    buffer.append(form);
-                                }
-                            }
-                            if (buffer.length() > 0) {
-                                out.println(buffer.toString());
-                            }
-                        }
-                    }
-                }
-            } while (line != null);
-            reader.close();
-            reader = null;
-
-        } catch (Exception e) {
-            throw new MorphologicalAnalyserBuildException("Cannot generate the full dictionary.", e);
-        } finally {
-            if (out != null) {
-                out.close();
-            }
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException ex) {
-                    logger.log(Level.WARNING, "Cannot close stream", ex);
-                }
-            }
-        }
-        logger.info("STEP " + STEP_GENERATE_FULL_DICTIONARY
-                + " (FULL DICTIONARY GENERATION) finished.");
-    }
+    
+    
 
     public static void saveInflectionPatternsBase(final InflectionPatternsBase ipb,
                                                   final String ipbPath)
@@ -530,9 +229,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void createInflectionPatternsBase() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_CREATE_INFLECTION_PATTERNS_BASE
-                + " (INFLECTION PATTERN BASE CREATION) started.");
-
         // Receives base forms during the IPB creation process.
         BaseFormsDictionary dict = new SimpleBaseFormsDictionary();
 
@@ -612,13 +308,10 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
             }
         }
 
-        logger.info("STEP " + STEP_CREATE_INFLECTION_PATTERNS_BASE
-                + " (INFLECTION PATTERN BASE CREATION) finished.");
     }
 
     public static void applyTags(InflectionPatternsBase ipb) throws
             MorphologicalAnalyserBuildException {
-        logger.info("APPLING TAGS AUTOMATICALY started");
 
         String taggingInfoPath = getPath(EXTENSION_TAGGING_INFO);
         String taggingFilePath = getPath(EXTENSION_TAGGING_FILE);
@@ -746,7 +439,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 }
             }
         }
-        logger.info("APPLING TAGS AUTOMATICALY finished");
     }
 
     private static String applyReplacements(String marks, Map replacements) {
@@ -786,8 +478,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void printMorphemesStatistic() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_MORPHEMES_STATISTICS
-                + " (PRINT MORPHEME STATISTIC) started.");
 
         // load inflection patterns base
         InflectionPatternsBase ipb = loadInflectionPatternsBase(getPath(EXTENSION_IPB));
@@ -801,8 +491,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                     "Cannot print the morpheme statistic to the file: " + outPath, e);
         }
 
-        logger.info("STEP " + STEP_MORPHEMES_STATISTICS
-                + " (PRINT MORPHEME STATISTIC) finished.");
     }
 
     public static Tagset loadTagset(final String tagsetPath)
@@ -839,8 +527,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void tagInflectionPatterns() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_TAG_INFLECTION_PATTERNS
-                + " (TAG INFLECTION PATTERNS) started.");
 
         // load tagset
         String tagsetPath = getPath(EXTENSION_TAGSET);
@@ -895,8 +581,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
             logger.info("Cannot find tagset at location " + tagsetPath);
         }
 
-        logger.info("STEP " + STEP_TAG_INFLECTION_PATTERNS
-                + " (TAG INFLECTION PATTERNS) finished.");
     }
 
     /**
@@ -906,8 +590,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void determineCorePatterns() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_DETERMINE_CORE_PATTERNS
-                + " (DETERMINE CORE PATTERNS) started.");
 
         // load inflection patterns base
         InflectionPatternsBase ipb = loadInflectionPatternsBase(getPath(EXTENSION_IPB));
@@ -929,8 +611,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                     "Cannot log out the inflection pattern base to the file: " + logPath, e);
         }
 
-        logger.info("STEP " + STEP_DETERMINE_CORE_PATTERNS
-                + " (DETERMINE CORE PATTERNS) finished.");
     }
 
     /**
@@ -940,8 +620,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      */
     public static void createAnalyser(DynamicCharset charset) throws
             MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_CREATE_ANALYSER
-                + " (CREATE ANALYSER) started.");
 
         BaseFormsDictionary dict;
 
@@ -1051,8 +729,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                     "Cannot store analyser in path: " + analyserPath, e);
         }
 
-        logger.info("STEP " + STEP_CREATE_ANALYSER
-                + " (CREATE ANALYSER) finished.");
     }
 
     /**
@@ -1061,8 +737,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void createTrainingSet() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_CREATE_TRAINING_SET
-                + " (CREATE TRAINING SET) started.");
         // open analyser
         String path = getPath(EXTENSION_ANALYSER);
         MorphologicalAnalyserImpl analyser = null;
@@ -1110,10 +784,10 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                     line = line.trim();
                     ExtendedInflectionPattern ip = ipb.getInflectionPattern(line);
                     if (ip != null) {
-                        String[] tab = line.split("\\s");
-                        String baseForm = tab[0];
+                        String[] tab = line.split(",");
+                        String baseForm = tab[0].trim();
                         for (int i = 0; i < tab.length; i++) {
-                            String form = tab[i];
+                            String form = tab[i].trim();
                             if (form.length() > 0) {
                                 try {
                                     List result = analyser.analyse2list(form);
@@ -1172,8 +846,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
             logger.log(Level.WARNING, "Cannot close training set.", e);
         }
 
-        logger.info("STEP " + STEP_CREATE_TRAINING_SET
-                + " (CREATE TRAINING SET) finished.");
     }
 
     /**
@@ -1212,8 +884,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void learnNeuralNetwork() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_LEARN_NEURAL_NETWORK
-                + " (CREATE LEARN NEURAL NETWORK) started.");
 
         // load training set
         String path = getPath(EXTENSION_TRAINING_SET);
@@ -1408,8 +1078,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
 //            }
 //            eta = ITERATION_DIVIDER * eta;
 //        }
-        logger.info("STEP " + STEP_LEARN_NEURAL_NETWORK
-                + " (CREATE LEARN NEURAL NETWORK) finished.");
     }
 
     /**
@@ -1418,8 +1086,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void createJarPackage() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_CREATE_JAR_PACKAGE
-                + " (CREATE JAR PACKAGE) started.");
         // open analyser
         String path = getPath(EXTENSION_ANALYSER);
         MorphologicalAnalyserImpl analyser = null;
@@ -1556,8 +1222,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
             }
         }
 
-        logger.info("STEP " + STEP_CREATE_JAR_PACKAGE
-                + " (CREATE JAR PACKAGE) finished.");
     }
 
     /**
@@ -1566,7 +1230,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @throws MorpologicalAnalyserBuildException if any processing error occurred.
      */
     public static void testAnalyser() throws MorphologicalAnalyserBuildException {
-        logger.info("STEP " + STEP_TEST_ANALYSER + " (TEST ANALYSER) started.");
         // open analyser
         String path = getPath(EXTENSION_ANALYSER);
         MorphologicalAnalyserImpl analyser = null;
@@ -1593,7 +1256,7 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
         analyser.setUseBaseFormsDictionary(false);
         analyser.setUseBaseFormsDictionary(true);
         analyser.setUseNeuralNetwork(false);
-//        analyser.setUseNeuralNetwork(true);
+        //analyser.setUseNeuralNetwork(true);
 
 //        analyser.setBaseFormsBloomFilter(null);
         String line;
@@ -1609,10 +1272,13 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 line = reader.readLine();
                 if (line != null && line.trim().length() > 0) {
                     line = line.trim();
-                    String[] tab = line.split(" ");
-                    String baseForm = tab[0];
+                    String[] tab = line.split(",");
+                    String baseForm = tab[0].trim();
                     for (int i = 0; i < tab.length; i++) {
-                        String form = tab[i];
+                        String form = tab[i].trim();
+                        if (form.length() == 0) {
+                            continue;
+                        }
                         List result;
                         try {
                             result = analyser.analyse2list(form);
@@ -1736,7 +1402,6 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
                 }
             }
         }
-        logger.info("STEP " + STEP_TEST_ANALYSER + " (TEST ANALYSER) finished.");
     }
 
     /**
@@ -1747,60 +1412,87 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @return <code>true</code> if the given step should be executed according to {@link fromStep}
      *         and {@link toStep} constants.
      */
-    private static boolean isStepExecuted(final int step) {
-        return step >= fromStep && step <= toStep;
+    private static boolean isStepExecuted(final MorphologicalAnalyserBuildStep step) {
+        return step.compareTo(fromStep) >= 0 && step.compareTo(toStep) <= 0;
     }
 
     /**
-     * Runs steps of the generation process of a morphological analyser.
+     * Runs successive steps of the morphological analyzer generation process.
      *
      *
-     * @throws MorpologicalAnalyserBuildException if any processing error occurred.
+     * @throws MorphologicalAnalyserBuildException if any processing error occurred.
      */
     public static void processLanguage() throws MorphologicalAnalyserBuildException {
         DynamicCharset charset = new DynamicCharset("international", new String[0]);
         charset.setInternational();
         vowels = new VowelCharactersImpl(language, charset);
-        if (isStepExecuted(STEP_GENERATE_FULL_DICTIONARY)) {
-            if (symbol.startsWith("full_")) {
-                regenerateFullDictionary();
-            } else {
-                generateFullDictionary();
+
+        for (MorphologicalAnalyserBuildStep step : MorphologicalAnalyserBuildStep.values()) {
+            if (isStepExecuted(step)) {
+                logger.info(String.format("Start step : %s", step.toString()));
+                long startTime = System.currentTimeMillis();
+                switch (step) {
+                    case STEP_GENERATE_FULL_DICTIONARY:
+                        if (symbol.startsWith("full_")) {
+                            FullDictionaryGenerator.regenerateFullDictionary();
+                        } else {
+                            FullDictionaryGenerator.generateFullDictionary(workingDirectory, symbol);
+                        }
+                        break;
+                    case STEP_CREATE_INFLECTION_PATTERNS_BASE:
+                        createInflectionPatternsBase();
+                        break;
+
+                    case STEP_MORPHEMES_STATISTICS:
+                        printMorphemesStatistic();
+                        break;
+
+                    case STEP_TAG_INFLECTION_PATTERNS:
+                        tagInflectionPatterns();
+                        break;
+
+                    case STEP_DETERMINE_CORE_PATTERNS:
+                        determineCorePatterns();
+                        break;
+
+                    case STEP_CREATE_ANALYSER:
+                        createAnalyser(charset);
+                        break;
+
+                    case STEP_CREATE_TRAINING_SET:
+                        createTrainingSet();
+                        break;
+
+                    case STEP_LEARN_NEURAL_NETWORK:
+                        learnNeuralNetwork();
+                        break;
+
+                    case STEP_CREATE_JAR_PACKAGE:
+                        createJarPackage();
+                        break;
+
+                    case STEP_TEST_ANALYSER:
+                        testAnalyser();
+                        break;
+                        
+                    default :
+                        throw new MorphologicalAnalyserBuildException(
+                                "Unsupported step " + step.toString());
+
+                }
+
+                long duration = (System.currentTimeMillis() - startTime) / 1000;
+                logger.info(
+                    String.format("End step : %s in %d seconds", step.toString(), duration));
             }
-        }
-        if (isStepExecuted(STEP_CREATE_INFLECTION_PATTERNS_BASE)) {
-            createInflectionPatternsBase();
-        }
-        if (isStepExecuted(STEP_MORPHEMES_STATISTICS)) {
-            printMorphemesStatistic();
-        }
-        if (isStepExecuted(STEP_TAG_INFLECTION_PATTERNS)) {
-            tagInflectionPatterns();
-        }
-        if (isStepExecuted(STEP_DETERMINE_CORE_PATTERNS)) {
-            determineCorePatterns();
-        }
-        if (isStepExecuted(STEP_CREATE_ANALYSER)) {
-            createAnalyser(charset);
-        }
-        if (isStepExecuted(STEP_CREATE_TRAINING_SET)) {
-            createTrainingSet();
-        }
-        if (isStepExecuted(STEP_LEARN_NEURAL_NETWORK)) {
-            learnNeuralNetwork();
-        }
-        if (isStepExecuted(STEP_CREATE_JAR_PACKAGE)) {
-            createJarPackage();
-        }
-        if (isStepExecuted(STEP_TEST_ANALYSER)) {
-            testAnalyser();
         }
     }
 
-    public static void processLanguage(String dirPath, String symb, Locale lang, int from, int to) {
+    public static void processLanguage(String dirPath, String symb, Locale lang, 
+            MorphologicalAnalyserBuildStep from, MorphologicalAnalyserBuildStep to) {
         language = lang;
         symbol = symb;
-        dictionariesPath = dirPath;
+        workingDirectory = dirPath;
         fromStep = from;
         toStep = to;
         processingThread = new Thread(new MorphologicalAnalyserBuilder(),
@@ -1814,9 +1506,9 @@ public final class MorphologicalAnalyserBuilder implements Runnable {
      * @param args The array of command line arguments.
      */
     public static void main(final String[] args) {
-        for (int i = 0; i < dictionaries.length; i++) {
-            language = languages[i];
-            symbol = dictionaries[i];
+        for (int i = 0; i < MorphologicalAnalyserBuilderParameters.dictionaries.length; i++) {
+            symbol = MorphologicalAnalyserBuilderParameters.dictionaries[i];
+            language = MorphologicalAnalyserBuilderParameters.languages[i];
             try {
                 processLanguage();
             } catch (MorphologicalAnalyserBuildException e) {

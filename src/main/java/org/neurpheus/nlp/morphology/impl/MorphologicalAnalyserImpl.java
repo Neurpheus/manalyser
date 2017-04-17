@@ -27,12 +27,14 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.neurpheus.collections.hashing.BloomFilter;
@@ -77,10 +79,10 @@ import org.neurpheus.nlp.morphology.tagset.Tagset;
  * @author Jakub Strychowski
  */
 public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser implements Serializable,
-        MorphologicalAnalyser, WordFormGenerator {
+        WordFormGenerator {
 
     /** The logger for this class. */
-    private static Logger logger = Logger.getLogger(MorphologicalAnalyserImpl.class.getName());
+    private static final Logger logger = Logger.getLogger(MorphologicalAnalyserImpl.class.getName());
 
     /** Unique serialization identifier of this class. */
     static final long serialVersionUID = 770608061005084934L;
@@ -145,7 +147,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
 
     private transient double weightMultipler;
 
-    private transient ArrayList processingObjects;
+    private transient Deque<MorphologicalAnalyserProcessingObject> processingObjects;
     
     private DynamicCharset charset;
 
@@ -156,21 +158,21 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         useBaseFormsDictionary = true;
         setUseNeuralNetwork(true);
         setSupportedLocales(new ArrayList(instances.keySet()));
-        processingObjects = new ArrayList();
+        processingObjects = new ConcurrentLinkedDeque<>();
         frequentFormsCache = new HashMap();
         cache = new LRUCache(CACHE_SIZE);
     }
 
     public final static char BASE_FORM_TAG = '!';
-    public final static char CORE_TAG = '/';
-    public final static char WILDCARD = '*';
-    public final static char VOWEL = '$';
     public final static char CONSONANT = '#';
-    public final static Character BASE_FORM_TAG_CHARACTER = new Character(BASE_FORM_TAG);
-    public final static Character CORE_TAG_CHARACTER = new Character(CORE_TAG);
-    public final static Character WILDCARD_CHARACTER = new Character(WILDCARD);
-    public final static Character VOWEL_CHARACTER = new Character(VOWEL);
-    public final static Character CONSONANT_CHARACTER = new Character(CONSONANT);
+    public final static char VOWEL = '$';
+    public final static char WILDCARD = '%';
+    public final static char CORE_TAG = '&';
+    public final static Character BASE_FORM_TAG_CHARACTER = BASE_FORM_TAG;
+    public final static Character CORE_TAG_CHARACTER = CORE_TAG;
+    public final static Character WILDCARD_CHARACTER = WILDCARD;
+    public final static Character VOWEL_CHARACTER = VOWEL;
+    public final static Character CONSONANT_CHARACTER = CONSONANT;
     public final static Integer BASE_FORM_TAG_INTEGER = new Integer((int) BASE_FORM_TAG);
     public final static Integer CORE_TAG_INTEGER = new Integer((int) CORE_TAG);
     public final static Integer WILDCARD_INTEGER = new Integer((int) WILDCARD);
@@ -209,34 +211,24 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         this.charset = charset;
     }
 
-    public class ProcessingState {
-
-        public int stateType;
-        public int chPos;
-        public char c;
-        public Integer cint;
-        public LinkedListTreeNode node;
-        public int suffixPos;
-        public int prefixPos;
-        public int corePos;
-
-        public ProcessingState() {
-
-        }
-
-        public void set(ProcessingState state) {
-            stateType = state.stateType;
-            chPos = state.chPos;
-            c = state.c;
-            cint = state.cint;
-            node = state.node;
-            suffixPos = state.suffixPos;
-            prefixPos = state.prefixPos;
-            corePos = state.corePos;
-
-        }
-
+    private void logState(String str, MorphologicalAnalyserProcessingState state) {
+        StringBuilder traceInfo = new StringBuilder(100);
+        traceInfo.append(str);
+        traceInfo.append("|state=");
+        traceInfo.append(state.stateType);
+        traceInfo.append("|pos=");
+        traceInfo.append(state.chPos);
+        traceInfo.append("|c=");
+        traceInfo.append(state.c);
+        traceInfo.append("|spos=");
+        traceInfo.append(state.suffixPos);
+        traceInfo.append("|ppos=");
+        traceInfo.append(state.prefixPos);
+        traceInfo.append("|cpos=");
+        traceInfo.append(state.corePos);
+        logger.log(Level.FINEST, traceInfo.toString());
     }
+
 
     public static String makeForm(String core, String supplement) {
         char[] cTab = core.toCharArray();
@@ -287,29 +279,6 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         //return res.toString();
     }
 
-    private class ProcessingObject {
-
-        int[] intStack;
-        ProcessingState[] stack;
-        HashMap checkedForms;
-        ArrayList result;
-
-        public ProcessingObject() {
-            stack = new ProcessingState[40];
-            for (int i = 0; i < stack.length; i++) {
-                stack[i] = new ProcessingState();
-            }
-            intStack = new int[1000];
-            checkedForms = new HashMap(50);
-            result = new ArrayList(30);
-        }
-
-        public void clear() {
-            checkedForms.clear();
-            result.clear();
-        }
-
-    }
 
     public Tagset getTagset() {
         Tagset res = ipb.getTagset();
@@ -320,11 +289,11 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         return res;
     }
 
-    public List analyse2list(final String inputString) throws MorphologyException {
+    public final List analyse2list(final String inputString) throws MorphologyException {
         return analyse2list(inputString, false);
     }
 
-    public List analyse2list(final String inputString, final boolean forGeneration) throws
+    public final List analyse2list(final String inputString, final boolean forGeneration) throws
             MorphologyException {
         if (!isInitialized()) {
             init();
@@ -364,9 +333,9 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         }
 
         //String s = startsFromUppercase ? inputString.toLowerCase() : inputString;
-        String s = inputString;
+        String str = inputString;
 
-        char fistCharLowercased = s.charAt(0);
+        char fistCharLowercased = str.charAt(0);
         if (startsFromUppercase) {
             fistCharLowercased = Character.toLowerCase(fistCharLowercased);
         }
@@ -377,17 +346,17 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
 
         ArrayList result;
         int[] intStack;
-        ProcessingState[] stack;
+        MorphologicalAnalyserProcessingState[] stack;
         HashMap checkedForms;
-        ProcessingObject po;
-        synchronized (processingObjects) {
-            if (processingObjects.isEmpty()) {
-                po = new ProcessingObject();
-            } else {
-                po = (ProcessingObject) processingObjects.remove(processingObjects.size() - 1);
-                po.clear();
-            }
+        MorphologicalAnalyserProcessingObject po;
+        if (processingObjects.isEmpty()) {
+            po = new MorphologicalAnalyserProcessingObject();
+        } else {
+            po = processingObjects.pop();
+            po.clear();
         }
+        po.startsFromUppercase = startsFromUppercase;
+        po.lowercasedFirstCharacter = fistCharLowercased;
         result = po.result;
         intStack = po.intStack;
         stack = po.stack;
@@ -395,36 +364,24 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
 
         int stackPos = 0;
 
-        ProcessingState state = new ProcessingState();
+        MorphologicalAnalyserProcessingState state = new MorphologicalAnalyserProcessingState();
         state.stateType = STATE_MATCH_SUFFIX;
         state.chPos = length - 1;
-        state.c = s.charAt(state.chPos);
-        state.cint = new Integer((int) state.c);
-        state.node = (LinkedListTreeNode) tree.getRoot();
+        state.c = str.charAt(state.chPos);
+        state.cint = (int) state.c;
+        state.node = tree.getRoot();
         boolean perfectMatching = false;
 
         LinkedListTreeNode tmpNode;
         LinkedListTreeNode[] foundChildren = new LinkedListTreeNode[5];
-        ProcessingState ps;
+        MorphologicalAnalyserProcessingState ps;
 
+        StringBuilder core = new StringBuilder(100);
+        
         boolean finish = false;
         while (!finish) {
             if (logger.isLoggable(Level.FINEST)) {
-                StringBuffer traceInfo = new StringBuffer();
-                traceInfo.append(s);
-                traceInfo.append("|state=");
-                traceInfo.append(state.stateType);
-                traceInfo.append("|pos=");
-                traceInfo.append(state.chPos);
-                traceInfo.append("|c=");
-                traceInfo.append(state.c);
-                traceInfo.append("|spos=");
-                traceInfo.append(state.suffixPos);
-                traceInfo.append("|ppos=");
-                traceInfo.append(state.prefixPos);
-                traceInfo.append("|cpos=");
-                traceInfo.append(state.corePos);
-                logger.log(Level.FINEST, traceInfo.toString());
+                logState(str, state);
             }
             switch (state.stateType) {
                 case STATE_MATCH_SUFFIX:
@@ -442,8 +399,8 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         ps.stateType = STATE_MATCH_PREFIX;
                         ps.node = tmpNode;
                         ps.chPos = 0;
-                        ps.c = s.charAt(0);
-                        ps.cint = new Integer((int) ps.c);
+                        ps.c = str.charAt(0);
+                        ps.cint = (int) ps.c;
                     }
 
 
@@ -467,7 +424,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                     tmpNode = foundChildren[2];
                     
                     if (tmpNode == null && startsFromUppercase && state.chPos == 0) {
-                        tmpNode = (LinkedListTreeNode) state.node.getChild(firtCharCode, intStack, 0);
+                        tmpNode = state.node.getChild(firtCharCode, intStack, 0);
                         
                     }
                     if (tmpNode != null) {
@@ -475,52 +432,22 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         if (state.chPos < 0) {
                             if (tmpNode.hasExtraData()) {
                                 // get index of an array of inflection patterns.
-                                int ipaIndex = ((Integer) ((TreeNodeWithData) tmpNode).getData()).intValue();
-                                ExtendedInflectionPattern[] ipa = ipm.get(ipaIndex);
-                                for (int k = 0; k < ipa.length; k++) {
-                                    // TODO : check this case
-                                    ExtendedInflectionPattern ip = ipa[k];
-                                    FormPattern fp = ip.getBaseFormPattern();
-                                    ExtendedMorphologicalAnalysisResult mar = new ExtendedMorphologicalAnalysisResult(
-                                            fp.getAffixes(),
-                                            PERFECT_MATCHING_WEIGHT,
-                                            "",
-                                            fp.getAffixes(),
-                                            fp.getGrammaticalPropertiesList(),
-                                            ip);
-                                    result.add(mar);
-                                }
+                                addResult(result, ipm, tmpNode, null, PERFECT_MATCHING_WEIGHT, null, po, perfectMatching);
                                 perfectMatching = true;
                             }
                             // end of the word - check if this is a base form
                             if (useBaseFormsDictionary) {
-                                tmpNode = (LinkedListTreeNode) tmpNode.getChild(
-                                        BASE_FORM_TAG_INTEGER, intStack, 0);
+                                tmpNode = tmpNode.getChild(BASE_FORM_TAG_INTEGER, intStack, 0);
                                 if (tmpNode != null) {
                                     // get index of an array of inflection patterns.
-                                    int ipaIndex = ((Integer) ((TreeNodeWithData) tmpNode).getData()).
-                                            intValue();
-                                    ExtendedInflectionPattern[] ipa = ipm.get(ipaIndex);
-                                    for (int k = 0; k < ipa.length; k++) {
-                                        // add as a base form to the list of result forms.
-                                        ExtendedInflectionPattern ip = ipa[k];
-                                        FormPattern fp = ip.getBaseFormPattern();
-                                        ExtendedMorphologicalAnalysisResult mar = new ExtendedMorphologicalAnalysisResult(
-                                                s.toString(),
-                                                PERFECT_MATCHING_WEIGHT,
-                                                null,
-                                                fp.getAffixes(),
-                                                fp.getGrammaticalPropertiesList(),
-                                                ip);
-                                        result.add(mar);
-                                    }
+                                    addResult(result, ipm, tmpNode, str, PERFECT_MATCHING_WEIGHT, null, po, perfectMatching);
                                     perfectMatching = true;
                                 }
                             }
                             finish = true;
                         } else {
-                            state.c = s.charAt(state.chPos);
-                            state.cint = new Integer((int) state.c);
+                            state.c = str.charAt(state.chPos);
+                            state.cint = (int) state.c;
                             state.node = tmpNode;
                         }
                     } else {
@@ -548,13 +475,13 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                             ps.set(state);
                             ps.chPos--;
                             if (ps.chPos >= 0) {
-                                ps.c = s.charAt(ps.chPos);
-                                ps.cint = new Integer((int) ps.c);
+                                ps.c = str.charAt(ps.chPos);
+                                ps.cint = (int) ps.c;
                                 ps.node = tmpNode;
                             } else {
                                 ps.node = tmpNode;
                                 ps.c = 0;
-                                ps.cint = new Integer(0);
+                                ps.cint = 0;
                             }
                         }
                     } else {
@@ -570,8 +497,8 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                         ps.stateType = STATE_MATCH_PREFIX;
                         ps.node = tmpNode;
                         ps.chPos = 0;
-                        ps.c = s.charAt(0);
-                        ps.cint = new Integer((int) ps.c);
+                        ps.c = str.charAt(0);
+                        ps.cint = (int) ps.c;
                         ps.suffixPos = state.suffixPos;
                         ps.corePos = state.chPos + 1;
                     }
@@ -598,18 +525,18 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                     
                     
                     if (tmpNode == null && startsFromUppercase && state.chPos == 0) {
-                        tmpNode = (LinkedListTreeNode) state.node.getChild(firtCharCode, intStack, 0);
+                        tmpNode = state.node.getChild(firtCharCode, intStack, 0);
                     }
                     if (tmpNode != null) {
                         state.chPos--;
                         if (state.chPos >= 0) {
-                            state.c = s.charAt(state.chPos);
-                            state.cint = new Integer((int) state.c);
+                            state.c = str.charAt(state.chPos);
+                            state.cint = (int) state.c;
                             state.node = tmpNode;
                         } else {
                             state.node = tmpNode;
                             state.c = 0;
-                            state.cint = new Integer(0);
+                            state.cint = 0;
                         }
                     } else {
                         finish = true;
@@ -618,35 +545,23 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                 case STATE_MATCH_REMAINING_CHARACTERS:
                     while (state.chPos >= 0 && state.node != null) {
                         LinkedListTreeNode tnode = state.node;
-                        state.node = (LinkedListTreeNode) tnode.getChild(state.cint, intStack, 0);
+                        state.node = tnode.getChild(state.cint, intStack, 0);
                         if (state.node == null && startsFromUppercase && state.chPos == 0) {
-                            state.node = (LinkedListTreeNode) tnode.getChild(firtCharCode, intStack,
-                                                                             0);
+                            state.node = tnode.getChild(firtCharCode, intStack, 0);
                         }
                         state.chPos--;
                         if (state.chPos >= 0) {
-                            state.c = s.charAt(state.chPos);
-                            state.cint = new Integer((int) state.c);
+                            state.c = str.charAt(state.chPos);
+                            state.cint = (int) state.c;
                         }
                     }
                     if (state.node != null && state.chPos < 0 && state.node.hasExtraData()) {
                         // get index of an array of inflection patterns.
-                        int ipaIndex = ((Integer) ((TreeNodeWithData) state.node).getData()).intValue();
-                        ExtendedInflectionPattern[] ipa = ipm.get(ipaIndex);
-                        String core = s.substring(state.corePos, state.suffixPos) + WILDCARD_CHARACTER;
-                        String affixes = WILDCARD_CHARACTER + s.substring(state.suffixPos);
-                        for (int i = 0; i < ipa.length; i++) {
-                            ExtendedInflectionPattern ip = ipa[i];
-                            String baseForm = makeForm(core, ip.getBaseFormPattern().getAffixes());
-                            result.add(new ExtendedMorphologicalAnalysisResult(
-                                    baseForm,
-                                    PERFECT_MATCHING_WEIGHT,
-                                    core,
-                                    affixes,
-                                    null,
-                                    ip));
-                            perfectMatching = true;
-                        }
+                        core.setLength(0);
+                        core.append(str, state.corePos, state.suffixPos);
+                        core.append(WILDCARD_CHARACTER);
+                        addResult(result, ipm, state.node, null, PERFECT_MATCHING_WEIGHT, core.toString(), po, perfectMatching);
+                        perfectMatching = true;
                     }
                     finish = true;
                     break;
@@ -654,64 +569,40 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                     if (state.node.hasExtraData()) {
                         // get index of an array of inflection patterns.
                         int ipaIndex = ((Integer) ((TreeNodeWithData) state.node).getData()).intValue();
-                        ExtendedInflectionPattern[] ipa = ipm.get(ipaIndex);
-                        String core;
-                        String affixes;
+                        core.setLength(0);
                         if (state.chPos > 0) {
-                            core = WILDCARD_CHARACTER + s.substring(state.chPos, state.suffixPos) + WILDCARD_CHARACTER;
-                            affixes = s.substring(0, state.chPos) + WILDCARD_CHARACTER + s.
-                                    substring(state.suffixPos);
+                            core.append(WILDCARD_CHARACTER);
+                            core.append(str, state.chPos, state.suffixPos);
+                            core.append(WILDCARD_CHARACTER);
                         } else {
-                            core = s.substring(0, state.suffixPos) + WILDCARD_CHARACTER;
-                            affixes = WILDCARD_CHARACTER + s.substring(state.suffixPos);
+                            core.append(str, 0, state.suffixPos);
+                            core.append(WILDCARD_CHARACTER);
                         }
+                        
+                        double weight = weightMultipler * 
+                                + ((str.length() - state.suffixPos + state.chPos) * supplementWeight
+                                + (state.suffixPos - state.corePos) * corePatternWeight);
+
+                        perfectMatching |= addResult(result, ipm, state.node, null, -weight, core.toString(), po, perfectMatching);
+                        
+                        
+/*                        
                         for (int i = 0; i < ipa.length; i++) {
                             ExtendedInflectionPattern ip = ipa[i];
                             String baseForm = makeForm(core, ip.getBaseFormPattern().getAffixes());
-                            // calculate weight
-                            double weight = weightMultipler
+                            
+                            double weight = checkInBaseFormDictionary(baseForm, ip.getId(), po);
+                            if (weight != PERFECT_MATCHING_WEIGHT) {
+                                // calculate weight
+                                weight = weightMultipler
                                     * (ip.getNumberOfCoveredLexemes() * ipWeight
-                                    + (s.length() - state.suffixPos + state.chPos) * supplementWeight
+                                    + (str.length() - state.suffixPos + state.chPos) * supplementWeight
                                     + (state.suffixPos - state.corePos) * corePatternWeight);
-                            // check if the base form exists in well known forms dictionary
-                            if (useBaseFormsDictionary) {
-                                Object matchingData;
-                                if (checkedForms.containsKey(baseForm)) {
-                                    matchingData = checkedForms.get(baseForm);
-                                } else // check in bloom filter
-                                if (baseFormsBloomFilter == null || baseFormsBloomFilter.contains(
-                                        baseForm) || (startsFromUppercase && baseFormsBloomFilter.
-                                        contains(baseForm.toLowerCase()))) {
-                                    // base form found by bloom filter, 
-                                    // possible false positive - check in tree
-                                    StringBuffer buffer = new StringBuffer();
-                                    buffer.append(BASE_FORM_TAG);
-                                    buffer.append(baseForm);
-                                    buffer.reverse();
-                                    matchingData = ((LinkedListTreeNode) tree.getRoot()).getData(
-                                            buffer.toString(), intStack, 0);
-                                    if (matchingData == null && startsFromUppercase) {
-                                        buffer.setCharAt(buffer.length() - 2, fistCharLowercased);
-                                        matchingData = ((LinkedListTreeNode) tree.getRoot()).
-                                                getData(buffer.toString(), intStack, 0);
-                                    }
-                                    checkedForms.put(baseForm, matchingData);
-                                } else {
-                                    checkedForms.put(baseForm, null);
-                                    matchingData = null;
-                                }
-                                if (matchingData != null) {
-                                    int ipaIndex2 = ((Integer) matchingData).intValue();
-                                    ExtendedInflectionPattern[] ipa2 = ipm.get(ipaIndex2);
-                                    for (int k = ipa2.length - 1; k >= 0; k--) {
-                                        if (ip.getId() == ipa2[k].getId()) {
-                                            weight = PERFECT_MATCHING_WEIGHT;
-                                            perfectMatching = true;
-                                            break;
-                                        }
-                                    }
-                                }
+                                
+                            } else {
+                                perfectMatching = true;
                             }
+                            
                             if (!perfectMatching || weight == PERFECT_MATCHING_WEIGHT) {
                                 // add a single result to the list of result forms.
                                 ExtendedMorphologicalAnalysisResult res = new ExtendedMorphologicalAnalysisResult(
@@ -724,20 +615,20 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                                 result.add(res);
                             }
                         }
+                        */
                     }
                     // check succeding character
                     if (state.chPos >= state.corePos || state.chPos >= state.suffixPos) {
                         finish = true;
                     } else {
-                        tmpNode = (LinkedListTreeNode) state.node.getChild(state.cint, intStack, 0);
+                        tmpNode = state.node.getChild(state.cint, intStack, 0);
                         if (tmpNode == null && startsFromUppercase && state.chPos == 0) {
-                            tmpNode = (LinkedListTreeNode) state.node.getChild(firtCharCode,
-                                                                               intStack, 0);
+                            tmpNode = state.node.getChild(firtCharCode, intStack, 0);
                         }
                         if (tmpNode != null) {
                             state.chPos++;
-                            state.c = s.charAt(state.chPos);
-                            state.cint = new Integer((int) state.c);
+                            state.c = str.charAt(state.chPos);
+                            state.cint = (int) state.c;
                             state.node = tmpNode;
                         } else {
                             finish = true;
@@ -757,144 +648,102 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
             }
         }
 
-        if (result.size() > 0) {
-            if (perfectMatching) {
-                for (final Iterator it = result.iterator(); it.hasNext();) {
-                    ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.
-                            next();
-                    if (res.getAccuracy() < PERFECT_MATCHING_WEIGHT) {
-                        it.remove();
-                    }
-                }
-            } else if (result.size() > 1) {
-                if (isUseNeuralNetwork() && getNeuralNetwork() != null) {
-                    double[] inputs = getNeuralNetwork().getInputs();
-                    Arrays.fill(inputs, 0);
-                    int maxIPId = getMaxIndexOfNeuralInflectionPattern();
-                    double extraNeuronWeight = 0;
-                    for (final Iterator it = result.iterator(); it.hasNext();) {
-                        ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.
-                                next();
-                        ExtendedInflectionPattern ip = res.getInflectionPattern();
-                        int id = ip.getId();
-                        if (id > maxIPId) {
-                            extraNeuronWeight += res.getAccuracy();
-                        } else {
-                            inputs[id] = res.getAccuracy();
-                        }
-//                        ExtendedInflectionPattern[] ipa = res.getIpa();
-//                        for (int i = 0; i < ipa.length; i++) {
-//                            int id = ipa[i].getId();
-//                            if (id > maxIPId) {
-//                                extraNeuronWeight += res.getAccuracy();
-//                            } else {
-//                                inputs[id] = res.getAccuracy();
-//                            }
-//                        }
-                    }
-                    inputs[maxIPId + 1] = extraNeuronWeight;
-                    for (int i = s.length() - 1; i >= 0; i--) {
-                        int c = s.charAt(i) & 0x1F;
-                        inputs[maxIPId + 2 + c] += 0.2;
-                    }
+        postProcessResult(str, result, perfectMatching);
+        
 
-                    try {
-                        getNeuralNetwork().classify(inputs);
-                        double[] weights = getNeuralNetwork().getOutputs();
-                        //neuralNetwork.normalizeResult(weights);
-                        // check if extra neuron wins
-                        double maxValue = weights[maxIPId + 1];
-                        boolean extraNeuronWins = true;
-                        for (int i = weights.length - 2; extraNeuronWins && i >= 0; i--) {
-                            if (inputs[i] > 0 && weights[i] >= maxValue) {
-                                extraNeuronWins = false;
-                            }
-                        }
-//                        ArrayList nnResult = new ArrayList();
-                        for (final Iterator it = result.iterator(); it.hasNext();) {
-                            ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.
-                                    next();
-                            ExtendedInflectionPattern ip = res.getInflectionPattern();
-                            int id = ip.getId();
-                            double newWeight;
-                            if (extraNeuronWins) {
-                                newWeight = id > maxIPId ? 0.5 * res.getAccuracy() + 0.5 : 0.499 * weights[id] + 0.001 * res.
-                                        getAccuracy();
-                            } else {
-                                newWeight = id > maxIPId ? 0.5 * res.getAccuracy() : 0.5 + 0.499 * weights[id] + 0.001 * res.
-                                        getAccuracy();
-                            }
-                            res.setAccuracy(newWeight);
-//                            ExtendedInflectionPattern[] ipa = res.getIpa();
-//                            for (int i = 0; i < ipa.length; i++) {
-//                                int id = ipa[i].getId();
-//                                ExtendedInflectionPattern[] newIPA = new ExtendedInflectionPattern[1];
-//                                newIPA[0] = ipa[i];
-//                                double newWeight;
-//                                if (extraNeuronWins) {
-//                                    newWeight = id > maxIPId ? 0.5 * res.getAccuracy() + 0.5 : 0.5 * weights[id];
-//                                } else {
-//                                    newWeight = id > maxIPId ? 0.5 * res.getAccuracy() : 0.5 * weights[id] + 0.5;
-//                                }
-//                                ExtendedMorphologicalAnalysisResult newRes = new ExtendedMorphologicalAnalysisResult(res.getForm(), newWeight, res.getCore(), "", null, newIPA);
-//                                nnResult.add(newRes);
-//                            }
-                        }
-//                        result.clear();
-//                        result = nnResult;
-                    } catch (ClassificationException e) {
-                        logger.log(Level.SEVERE, "Cannot clasify inflection patterns using neural network.", e);
-                    }
-                }
-                Collections.sort(result);
-            }
-        }
-        if (result.size() == 0) {
-            ExtendedMorphologicalAnalysisResult res = new ExtendedMorphologicalAnalysisResult(
-                    s,
-                    PERFECT_MATCHING_WEIGHT,
-                    s,
-                    "",
-                    tagset.getUnknownGrammaticalPropertiesList(),
-                    null);
-            result.add(res);
-        } else if (result.size() == 1) {
-            ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) result.
-                    get(0);
-            res.setAccuracy(PERFECT_MATCHING_WEIGHT);
-//        } else {
-//            // normalize weights
-//            long weightsSum = 0;
-//            for (final Iterator it = result.iterator(); it.hasNext();) {
-//                MorphologicalAnalysisResultImpl res = (MorphologicalAnalysisResultImpl) it.next();
-//                weightsSum += res.getWeight();
-//            }
-//            for (final Iterator it = result.iterator(); it.hasNext();) {
-//                MorphologicalAnalysisResultImpl res = (MorphologicalAnalysisResultImpl) it.next();
-//                res.setWeight(100 * res.getWeight() / weightsSum);
-//            }
-        }
-        if (!perfectMatching && s.length() <= 3 && !((ExtendedMorphologicalAnalysisResult) result.
-                get(0)).getForm().equals(s)) {
-            ExtendedMorphologicalAnalysisResult res = new ExtendedMorphologicalAnalysisResult(
-                    s,
-                    PERFECT_MATCHING_WEIGHT,
-                    s,
-                    "",
-                    tagset.getUnknownGrammaticalPropertiesList(),
-                    null);
-            result.add(0, res);
-        }
-
-        synchronized (processingObjects) {
-            processingObjects.add(po);
-        }
+        processingObjects.push(po);
 
         result = new ArrayList(result);
         cache.put(inputString, result);
         return result;
     }
+    
+    private boolean addResult(
+            ArrayList<ExtendedMorphologicalAnalysisResult> result, 
+            InflectionPatternsMap ipm,
+            LinkedListTreeNode tmpNode, 
+            String baseForm, 
+            final double weight, 
+            String core,
+            MorphologicalAnalyserProcessingObject po,
+            boolean perfectMatching) {
+        boolean perfectWeight = perfectMatching;
+        int ipaIndex = ((Integer) ((TreeNodeWithData) tmpNode).getData());
+        ExtendedInflectionPattern[] ipa = ipm.get(ipaIndex);
+        double weight2 = weight;
+        for (ExtendedInflectionPattern ip : ipa) {
+            FormPattern fp = ip.getBaseFormPattern();
+            String resultForm = baseForm != null ? baseForm : 
+                    (core == null ? fp.getAffixes() : makeForm(core, fp.getAffixes()));
+            if (weight <= 0) {
+                if (checkInBaseFormDictionary(resultForm, ip.getId(), po) == PERFECT_MATCHING_WEIGHT) {
+                    weight2 = PERFECT_MATCHING_WEIGHT;
+                } else {
+                    weight2 = weightMultipler * ip.getNumberOfCoveredLexemes() * ipWeight - weight;
+                }
+            }
 
+            perfectWeight |= weight2 == PERFECT_MATCHING_WEIGHT;
+            
+            if (!perfectWeight || (weight2 == PERFECT_MATCHING_WEIGHT)) {
+            
+                ExtendedMorphologicalAnalysisResult mar = new ExtendedMorphologicalAnalysisResult(
+                        resultForm,
+                        weight2,
+                        core,
+                        fp.getAffixes(),
+                        fp.getGrammaticalPropertiesList(),
+                        ip);
+                result.add(mar);
+            }
+            
+        }
+        return perfectWeight;
+    }
+    
+
+    private double checkInBaseFormDictionary(String baseForm, int ipId, MorphologicalAnalyserProcessingObject processingObject) {
+        // check if the base form exists in well known forms dictionary
+        if (useBaseFormsDictionary) {
+            Object matchingData;
+            Map checkedForms = processingObject.checkedForms;
+            if (checkedForms.containsKey(baseForm)) {
+                matchingData = checkedForms.get(baseForm);
+            } else // check in bloom filter
+            if (baseFormsBloomFilter == null || baseFormsBloomFilter.contains(
+                    baseForm) || (processingObject.startsFromUppercase && baseFormsBloomFilter.
+                    contains(baseForm.toLowerCase()))) {
+                // base form found by bloom filter, 
+                // possible false positive - check in tree
+                StringBuilder buffer = new StringBuilder(30);
+                buffer.append(BASE_FORM_TAG);
+                buffer.append(baseForm);
+                buffer.reverse();
+                matchingData = ((LinkedListTreeNode) tree.getRoot()).getData(
+                        buffer.toString(), processingObject.intStack, 0);
+                if (matchingData == null && processingObject.startsFromUppercase) {
+                    buffer.setCharAt(buffer.length() - 2, processingObject.lowercasedFirstCharacter);
+                    matchingData = ((LinkedListTreeNode) tree.getRoot()).
+                            getData(buffer.toString(), processingObject.intStack, 0);
+                }
+                checkedForms.put(baseForm, matchingData);
+            } else {
+                checkedForms.put(baseForm, null);
+                matchingData = null;
+            }
+            if (matchingData != null) {
+                int ipaIndex2 = ((Integer) matchingData).intValue();
+                ExtendedInflectionPattern[] ipa2 = ipb.getInflectionPatternsMap().get(ipaIndex2);
+                for (int k = ipa2.length - 1; k >= 0; k--) {
+                    if (ipId == ipa2[k].getId()) {
+                        return PERFECT_MATCHING_WEIGHT;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+    
     public void clearCache() {
         cache.clear();
     }
@@ -925,17 +774,19 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
     private void writeFrequentFormsCache(DataOutputStream out) throws IOException {
         int size = frequentFormsCache == null ? 0 : frequentFormsCache.size();
         DataOutputStreamPacker.writeInt(size, out);
-        for (final Iterator it = frequentFormsCache.entrySet().iterator(); it.hasNext();) {
-            Map.Entry entry = (Map.Entry) it.next();
-            String form = (String) entry.getKey();
-            List resultList = (List) entry.getValue();
-            DataOutputStreamPacker.writeString(form, out);
-            DataOutputStreamPacker.writeInt(resultList.size(), out);
-            for (final Iterator it2 = resultList.iterator(); it2.hasNext();) {
-                MorphologicalAnalysisResult mar = (MorphologicalAnalysisResult) it2.next();
-                mar.write(out);
-            }
+        if (frequentFormsCache != null) {
+            for (final Iterator it = frequentFormsCache.entrySet().iterator(); it.hasNext();) {
+                Map.Entry entry = (Map.Entry) it.next();
+                String form = (String) entry.getKey();
+                List resultList = (List) entry.getValue();
+                DataOutputStreamPacker.writeString(form, out);
+                DataOutputStreamPacker.writeInt(resultList.size(), out);
+                for (final Iterator it2 = resultList.iterator(); it2.hasNext();) {
+                    MorphologicalAnalysisResult mar = (MorphologicalAnalysisResult) it2.next();
+                    mar.write(out);
+                }
 
+            }
         }
     }
 
@@ -1010,6 +861,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
     }
 
     public void read(final DataInputStream in) throws IOException {
+        processingObjects = new ConcurrentLinkedDeque<>();
         int len = in.readByte();
         byte[] tmp = new byte[len];
         in.readFully(tmp);
@@ -1083,7 +935,6 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                 logger.log(Level.SEVERE, "Cannot initialize neural network.", e);
             }
         }
-        processingObjects = new ArrayList();
         cache = new LRUCache(CACHE_SIZE);
         setInitialized(true);
 
@@ -1225,6 +1076,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
      * @throws org.neurpheus.nlp.morphology.MorphologyException if a serious error occurred during
      *                                                          the generation.
      */
+    @Override
     public String generateWordForm(String baseForm,
                                    GrammaticalProperties targetGrammaticalProperties)
             throws MorphologyException {
@@ -1256,24 +1108,30 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         return baseForm;
     }
 
+    @Override
     public String generateWordForm(String baseForm, String targetGrammaticalProperties) throws
             MorphologyException {
         GrammaticalProperties gp = getTagset().getGrammaticalProperties(targetGrammaticalProperties);
         return generateWordForm(baseForm, gp);
     }
 
-    public MorphologicalAnalysisResult[] analyse(String wordForm) throws MorphologyException {
+    private final static MorphologicalAnalysisResult[] EMPTY_ARRAY = new MorphologicalAnalysisResult[0];
+            
+    @Override
+    public final MorphologicalAnalysisResult[] analyse(String wordForm) throws MorphologyException {
         List list = analyse2list(wordForm);
-        return (MorphologicalAnalysisResult[]) list.toArray(new MorphologicalAnalysisResult[0]);
+        return (MorphologicalAnalysisResult[]) list.toArray(EMPTY_ARRAY);
     }
 
     private transient int quality = QualityConst.VERY_GOOD;
     private transient int speed = SpeedConst.MEDIUM;
 
+    @Override
     public int getQuality() {
         return quality;
     }
 
+    @Override
     public int getSpeed() {
         return speed;
     }
@@ -1334,6 +1192,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         initInstances();
     }
 
+    @Override
     public MorphologicalComponent getInstance(Locale locale) throws MorphologyException {
         MorphologicalComponent res = (MorphologicalComponent) instances.get(locale);
         if (res == null) {
@@ -1349,7 +1208,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
         cache = new LRUCache(CACHE_SIZE);
         useBaseFormsDictionary = true;
         setUseNeuralNetwork(true);
-        processingObjects = new ArrayList();
+        processingObjects = new ConcurrentLinkedDeque<>();
         setProperty(PropertyConst.AUTHORS, info.getAuthors());
         setProperty(PropertyConst.BUILD_DATE, info.getBuildData());
         setProperty(PropertyConst.COPYRIGHT, info.getCopyright());
@@ -1409,6 +1268,7 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
      * @throws org.neurpheus.nlp.morphology.MorphologyException if the component cannot be
      *                                                          initialised.
      */
+    @Override
     public void init() throws MorphologyException {
         if (isInitialized()) {
             return;
@@ -1465,7 +1325,138 @@ public class MorphologicalAnalyserImpl extends AbstractMorphologicalAnalyser imp
                 System.out.println(result[i].toString());
             }
         } catch (MorphologyException ex) {
-            ex.printStackTrace();
+            logger.log(Level.SEVERE, "cannot perform analysis",  ex);
+        }
+    }
+
+    private void postProcessResult(String str, ArrayList result, boolean perfectMatching) {
+        if (result.size() > 0) {
+            if (perfectMatching) {
+                for (final Iterator it = result.iterator(); it.hasNext();) {
+                    ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.
+                            next();
+                    if (res.getAccuracy() < PERFECT_MATCHING_WEIGHT) {
+                        it.remove();
+                    }
+                }
+            } else if (result.size() > 1) {
+                if (isUseNeuralNetwork() && getNeuralNetwork() != null) {
+                    double[] inputs = getNeuralNetwork().getInputs();
+                    Arrays.fill(inputs, 0);
+                    int maxIPId = getMaxIndexOfNeuralInflectionPattern();
+                    double extraNeuronWeight = 0;
+                    for (final Iterator it = result.iterator(); it.hasNext();) {
+                        ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.
+                                next();
+                        ExtendedInflectionPattern ip = res.getInflectionPattern();
+                        int id = ip.getId();
+                        if (id > maxIPId) {
+                            extraNeuronWeight += res.getAccuracy();
+                        } else {
+                            inputs[id] = res.getAccuracy();
+                        }
+//                        ExtendedInflectionPattern[] ipa = res.getIpa();
+//                        for (int i = 0; i < ipa.length; i++) {
+//                            int id = ipa[i].getId();
+//                            if (id > maxIPId) {
+//                                extraNeuronWeight += res.getAccuracy();
+//                            } else {
+//                                inputs[id] = res.getAccuracy();
+//                            }
+//                        }
+                    }
+                    inputs[maxIPId + 1] = extraNeuronWeight;
+                    for (int i = str.length() - 1; i >= 0; i--) {
+                        int c = str.charAt(i) & 0x1F;
+                        inputs[maxIPId + 2 + c] += 0.2;
+                    }
+
+                    try {
+                        getNeuralNetwork().classify(inputs);
+                        double[] weights = getNeuralNetwork().getOutputs();
+                        //neuralNetwork.normalizeResult(weights);
+                        // check if extra neuron wins
+                        double maxValue = weights[maxIPId + 1];
+                        boolean extraNeuronWins = true;
+                        for (int i = weights.length - 2; extraNeuronWins && i >= 0; i--) {
+                            if (inputs[i] > 0 && weights[i] >= maxValue) {
+                                extraNeuronWins = false;
+                            }
+                        }
+//                        ArrayList nnResult = new ArrayList();
+                        for (final Iterator it = result.iterator(); it.hasNext();) {
+                            ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) it.
+                                    next();
+                            ExtendedInflectionPattern ip = res.getInflectionPattern();
+                            int id = ip.getId();
+                            double newWeight;
+                            if (extraNeuronWins) {
+                                newWeight = id > maxIPId ? 0.5 * res.getAccuracy() + 0.5 : 0.499 * weights[id] + 0.001 * res.
+                                        getAccuracy();
+                            } else {
+                                newWeight = id > maxIPId ? 0.5 * res.getAccuracy() : 0.5 + 0.499 * weights[id] + 0.001 * res.
+                                        getAccuracy();
+                            }
+                            res.setAccuracy(newWeight);
+//                            ExtendedInflectionPattern[] ipa = res.getIpa();
+//                            for (int i = 0; i < ipa.length; i++) {
+//                                int id = ipa[i].getId();
+//                                ExtendedInflectionPattern[] newIPA = new ExtendedInflectionPattern[1];
+//                                newIPA[0] = ipa[i];
+//                                double newWeight;
+//                                if (extraNeuronWins) {
+//                                    newWeight = id > maxIPId ? 0.5 * res.getAccuracy() + 0.5 : 0.5 * weights[id];
+//                                } else {
+//                                    newWeight = id > maxIPId ? 0.5 * res.getAccuracy() : 0.5 * weights[id] + 0.5;
+//                                }
+//                                ExtendedMorphologicalAnalysisResult newRes = new ExtendedMorphologicalAnalysisResult(res.getForm(), newWeight, res.getCore(), "", null, newIPA);
+//                                nnResult.add(newRes);
+//                            }
+                        }
+//                        result.clear();
+//                        result = nnResult;
+                    } catch (ClassificationException e) {
+                        logger.log(Level.SEVERE, "Cannot clasify inflection patterns using neural network.", e);
+                    }
+                }
+                Collections.sort(result);
+            }
+        }
+        if (result.size() == 0) {
+            ExtendedMorphologicalAnalysisResult res = new ExtendedMorphologicalAnalysisResult(
+                    str,
+                    PERFECT_MATCHING_WEIGHT,
+                    str,
+                    "",
+                    getTagset().getUnknownGrammaticalPropertiesList(),
+                    null);
+            result.add(res);
+        } else if (result.size() == 1) {
+            ExtendedMorphologicalAnalysisResult res = (ExtendedMorphologicalAnalysisResult) result.
+                    get(0);
+            res.setAccuracy(PERFECT_MATCHING_WEIGHT);
+//        } else {
+//            // normalize weights
+//            long weightsSum = 0;
+//            for (final Iterator it = result.iterator(); it.hasNext();) {
+//                MorphologicalAnalysisResultImpl res = (MorphologicalAnalysisResultImpl) it.next();
+//                weightsSum += res.getWeight();
+//            }
+//            for (final Iterator it = result.iterator(); it.hasNext();) {
+//                MorphologicalAnalysisResultImpl res = (MorphologicalAnalysisResultImpl) it.next();
+//                res.setWeight(100 * res.getWeight() / weightsSum);
+//            }
+        }
+        if (!perfectMatching && str.length() <= 3 && !((ExtendedMorphologicalAnalysisResult) result.
+                get(0)).getForm().equals(str)) {
+            ExtendedMorphologicalAnalysisResult res = new ExtendedMorphologicalAnalysisResult(
+                    str,
+                    PERFECT_MATCHING_WEIGHT,
+                    str,
+                    "",
+                    getTagset().getUnknownGrammaticalPropertiesList(),
+                    null);
+            result.add(0, res);
         }
     }
 
